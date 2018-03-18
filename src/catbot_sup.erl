@@ -18,6 +18,14 @@ init([]) ->
      3000,
      worker,
      [catbot_image_sink]
+    },
+    {
+     catbot_reddit,
+     {catbot_reddit, start_link, []},
+     permanent,
+     3000,
+     worker,
+     [catbot_reddit]
     }
     ],
     {ok, { {one_for_one, 5, 10}, Children} }.

@@ -3,6 +3,8 @@
 -behaviour(gen_server).
 -compile(export_all).
 
+-include("include/records.hrl").
+
 -export([start_link/0]).
 
 %% gen_server callbacks
@@ -14,14 +16,16 @@
          code_change/3]).
 
 -record(state, {
-    bearer_token
+    bearer_token=""
 }).
 
 start_link() ->
     gen_server:start_link(?MODULE, [], []).
 
 init([]) ->
-    {ok, #state{bearer_token="OlucnzT39D2yXRVR4Z_QQ0ebSlg"}}.
+    self() ! heartbeat,
+    {ok, AccessToken} = get_access_token(),
+    {ok, #state{bearer_token = AccessToken}}.
 
 handle_call(Request, From, State) ->
     lager:info("Call ~p From ~p", [Request, From]),
@@ -31,6 +35,9 @@ handle_cast(Msg, State) ->
     lager:info("Cast ~p", [Msg]),
     {noreply, State}.
 
+handle_info(heartbeat, State) ->
+    State1 = update_all_subs(State),
+    {noreply, State1};
 handle_info(Info, State) ->
     lager:info("Info ~p", [Info]),
     {noreply, State}.
@@ -73,17 +80,21 @@ get_access_token() ->
             Json = jsx:decode(RespBody),
             case proplists:get_value(<<"access_token">>, Json) of
                 undefined -> {error, {bad_json, Json}};
-                Token when is_binary(Token) -> {ok, Token}
+                Token when is_binary(Token) -> {ok, binary_to_list(Token)}
             end
     end.
 
-make_api_request(State, Url) ->
+make_api_request(State, Url, Params) ->
     Headers = [
         {"User-agent", user_agent()},
         {"Authorization", "Bearer " ++ State#state.bearer_token}
     ],
-    Request = {Url, Headers},
-    HttpOptions = [{autoredirect, false}],
+    QueryString = binary_to_list(<<
+        <<K/binary, "=", V/binary, "&">> || {K, V} <- Params
+    >>),
+    FinalUrl = Url ++ "?" ++ QueryString,
+    Request = {FinalUrl, Headers},
+    HttpOptions = [{autoredirect, true}],
     Options = [{body_format, binary}],
     case httpc:request(get, Request, HttpOptions, Options) of
         {ok, {{_, 200, _}, _RespHeaders, RespBody}} ->
@@ -92,22 +103,89 @@ make_api_request(State, Url) ->
             {error, unauthorized}
     end.
 
-get_link_urls(State) ->
-    {ok, Json} = make_api_request(State, "https://oauth.reddit.com/r/cats/new"),
-    Data = proplists:get_value(<<"data">>, Json),
-    Children = proplists:get_value(<<"children">>, Data),
-    ChildData = [
-        proplists:get_value(<<"data">>, Child, []) || Child <- Children
-    ],
-    ChildUrls = [
-        proplists:get_value(<<"url">>, Datum) || Datum <- ChildData
-    ],
-    lists:filter(
-        fun erlang:is_binary/1,
-        ChildUrls
+update_all_subs(InitialState) ->
+    _FinalState = lists:foldl(
+        fun(Source, State) ->
+            _State1 = update_subreddit(State, Source)
+        end,
+        InitialState,
+        [catbot_db:get_source_subreddits()]
     ).
 
-is_content_type_image(Type) when is_list(Type) ->
-    is_content_type_image(list_to_binary(Type));
-is_content_type_image(<<"image/", _Rest/binary>>) -> true;
-is_content_type_image(_) -> false.
+update_subreddit(State, Sub=#source_subreddit{}) ->
+    % Get the base API url
+    NameList = binary_to_list(Sub#source_subreddit.name),
+    Url = "https://oauth.reddit.com/r/" ++ NameList ++ "/new",
+
+    % Increase page size
+    Params = [
+        {<<"limit">>, <<"100">>}
+    ],
+
+    % Add 'after' param if known
+    Params1 = case Sub#source_subreddit.high_water_mark of
+        B when is_binary(B) -> [{<<"before">>, B}|Params];
+        _ -> Params
+    end,
+
+    case make_api_request(State, Url, Params1) of
+        {ok, Json} ->
+            Data = proplists:get_value(<<"data">>, Json),
+            % io:format("Got data: ~p~n", [Json]),
+
+            % Get the child elements in the list
+            Children = proplists:get_value(<<"children">>, Data),
+            lager:info("Fetched ~p records for sub ~s", [length(Children), Sub#source_subreddit.name]),
+
+            % If we didn't get any children, there's been nothing new since
+            % the last high water mark
+            case Children of
+                [] -> State;
+                _ ->
+                    % Extract the data from each subelement
+                    ChildData = [
+                        proplists:get_value(<<"data">>, Child, []) || Child <- Children
+                    ],
+
+                    % Grab the URLs from each subdata
+                    ChildUrls = [
+                        proplists:get_value(<<"url">>, Datum) || Datum <- ChildData
+                    ],
+
+                    % Filter out and junk from URLs that weren't set
+                    ValidUrls = lists:filter(
+                        fun erlang:is_binary/1,
+                        ChildUrls
+                    ),
+
+                    % Send the URLs to the image sink
+                    Prediction = Sub#source_subreddit.auto_prediction,
+                    lists:foreach(
+                        fun(U) -> catbot_image_sink:ingest(U, Prediction) end,
+                        ValidUrls
+                    ),
+
+                    % Grab the first child's name as a highwater
+                    FirstChild = hd(Children),
+                    FirstChildData = proplists:get_value(<<"data">>, FirstChild, []),
+                    FirstChildName = proplists:get_value(<<"name">>, FirstChildData),
+                    HighWater = FirstChildName,
+                    lager:info("New high water mark for ~s: ~s", [Sub#source_subreddit.name, HighWater]),
+
+                    % Update the highwater on the DB
+                    case HighWater of
+                        H when is_binary(H) ->
+                            catbot_db:set_high_water(Sub#source_subreddit.name, HighWater);
+                        _ -> ok
+                    end,
+
+                    % Recurse on the new high water mark
+                    update_subreddit(State, Sub#source_subreddit{
+                        high_water_mark=HighWater
+                    })
+            end;
+        {error, unauthorized} ->
+            % Re-up the access token and try again
+            {ok, AccessToken} = get_access_token(),
+            update_subreddit(State#state{bearer_token=AccessToken}, Sub)
+    end.

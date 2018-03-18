@@ -6,7 +6,7 @@
 
 -export([
     start_link/0,
-    ingest/1
+    ingest/2
 ]).
 
 %% gen_server callbacks
@@ -26,10 +26,10 @@
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
-ingest(Url) when is_binary(Url) ->
-    ingest(binary_to_list(Url));
-ingest(Url) when is_list(Url) ->
-    gen_server:cast(?MODULE, {ingest_url, Url}).
+ingest(Url, AutoPrediction) when is_binary(Url) ->
+    ingest(binary_to_list(Url), AutoPrediction);
+ingest(Url, AutoPrediction) when is_list(Url) ->
+    gen_server:cast(?MODULE, {ingest_url, Url, AutoPrediction}).
 
 init([]) ->
     process_flag(trap_exit, true),
@@ -43,8 +43,8 @@ handle_call(Request, From, State) ->
     lager:info("Call ~p From ~p", [Request, From]),
     {reply, ignored, State}.
 
-handle_cast({ingest_url, Url}, State) ->
-    State1 = ingest_url(State, Url),
+handle_cast({ingest_url, Url, AutoPrediction}, State) ->
+    State1 = ingest_url(State, Url, AutoPrediction),
     {noreply, State1};
 handle_cast(Msg, State) ->
     lager:info("Cast ~p", [Msg]),
@@ -77,13 +77,14 @@ init_worker_pool() ->
     _Pids = [Pid || {ok, Pid} <- Results].
 
 handle_worker_return(State, Pid) ->
+    estatsd:increment("catbot.ingest.success"),
     case State#state.pending_urls of
         [] ->
             % No pending work, put worker back on ready list
             State#state{free_workers=[Pid|State#state.free_workers]};
-        [Url|Urls] ->
+        [{Url, Prediction}|Urls] ->
             % Pending url, send it to the worker and leave off the ready list
-            catbot_image_sink_worker:ingest(Pid, Url),
+            catbot_image_sink_worker:ingest(Pid, Url, Prediction),
             State#state{pending_urls=Urls}
     end.
 
@@ -100,15 +101,15 @@ handle_worker_death(State, DeadPid) ->
 
     State#state{free_workers=Workers1}.
 
-ingest_url(State, Url) ->
+ingest_url(State, Url, AutoPrediction) ->
     case has_free_worker(State) of
         true ->
             {ok, State1, Pid} = checkout_worker(State),
-            catbot_image_sink_worker:ingest(Pid, Url),
+            catbot_image_sink_worker:ingest(Pid, Url, AutoPrediction),
             State1;
         false ->
             State#state{
-                pending_urls=[Url|State#state.pending_urls]
+                pending_urls=[{Url, AutoPrediction}|State#state.pending_urls]
             }
     end.
 

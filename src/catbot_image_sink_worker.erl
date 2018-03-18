@@ -4,7 +4,7 @@
 
 -export([
     start_link/0,
-    ingest/2
+    ingest/3
 ]).
 
 %% gen_server callbacks
@@ -20,8 +20,8 @@
 start_link() ->
     gen_server:start_link(?MODULE, [], []).
 
-ingest(Pid, Url) when is_list(Url) ->
-    gen_server:cast(Pid, {ingest_url, self(), Url}).
+ingest(Pid, Url, AutoPrediction) when is_list(Url) ->
+    gen_server:cast(Pid, {ingest_url, self(), Url, AutoPrediction}).
 
 init([]) ->
     process_flag(trap_exit, true),
@@ -31,8 +31,8 @@ handle_call(Request, From, State) ->
     lager:info("Call ~p From ~p", [Request, From]),
     {reply, ignored, State}.
 
-handle_cast({ingest_url, From, Url}, State) ->
-    ingest_url(State, From, Url),
+handle_cast({ingest_url, From, Url, AutoPrediction}, State) ->
+    ingest_url(State, From, Url, AutoPrediction),
     {noreply, State};
 handle_cast(Msg, State) ->
     lager:info("Cast ~p", [Msg]),
@@ -51,19 +51,33 @@ code_change(OldVsn, State, _Extra) ->
 
 %% Internal functions
 
-ingest_url(State, From, Url) ->
-    case is_image_url(Url) of
+ingest_url(State, From, Url, AutoPrediction) ->
+    case catbot_db:has_ingested_url(Url) of
         true ->
-            case download_image(Url) of
-                {ok, ImageData} ->
-                    {ok, FilePath} = save_image(ImageData),
-                    catbot_db:ingest_image(Url, FilePath);
-                error ->
-                    ok
-            end;
-        false -> ok
+            % Don't need to re-process
+            ok;
+        false ->
+            case is_image_url(Url) of
+                false ->
+                    % Only care about images
+                    ok;
+                true ->
+                    case download_image(Url) of
+                        {ok, ImageData} ->
+                            {ok, FilePath} = save_image(ImageData),
+                            catbot_db:ingest_image(Url, FilePath),
+                            % If we have an autoprediction based on the source, apply
+                            % that too
+                            case AutoPrediction of
+                                B when is_binary(B) ->
+                                    catbot_db:set_prediction(FilePath, AutoPrediction, 1.0);
+                                _ -> ok
+                            end;
+                        error ->
+                            ok
+                    end
+            end
     end,
-    lager:info("Ingested url ~s", [Url]),
     From ! {ingest_ok, self()}.
 
 save_image(ImageData) ->

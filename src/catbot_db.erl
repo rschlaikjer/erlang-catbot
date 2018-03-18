@@ -1,6 +1,8 @@
 -module(catbot_db).
 -compile(export_all).
 
+-include("include/records.hrl").
+
 -define(POOL_NAME, catbot_db_pool).
 
 init() ->
@@ -38,5 +40,58 @@ ingest_image(OriginalUrl, FilePath) ->
         [OriginalUrl, FilePath]
     ) of
         {ok, 1} -> ok;
-         {error,{error,error,_,unique_violation,_,_}} -> ok
+        {error,{error,error,_,unique_violation,_,_}} -> ok
+    end.
+
+get_source_subreddits() ->
+    case pgapp:equery(
+        ?POOL_NAME,
+        "SELECT *
+        FROM source_subreddits",
+        []
+    ) of
+        {ok, RowSpec, Rows} ->
+            RowProps = rows_to_proplists(RowSpec, Rows),
+            [#source_subreddit{
+                name=proplists:get_value(<<"name">>, Row),
+                high_water_mark=proplists:get_value(<<"high_water_mark">>, Row),
+                auto_prediction=proplists:get_value(<<"auto_prediction">>, Row)
+            } || Row <- RowProps]
+    end.
+
+rows_to_proplists(RowSpec, Rows) ->
+    ColNames = [element(2, Spec) || Spec <- RowSpec],
+    [lists:zip(ColNames, [element(I,Row) || I <- lists:seq(1,tuple_size(Row))])
+     || Row <- Rows].
+
+set_high_water(Name, HighWater) ->
+    case pgapp:equery(
+        ?POOL_NAME,
+        "UPDATE source_subreddits
+        SET high_water_mark = $2
+        WHERE name = $1",
+        [Name, HighWater]
+    ) of
+        {ok, 1} -> ok
+    end.
+
+set_prediction(ImagePath, Prediction, Confidence) ->
+    case pgapp:equery(
+        ?POOL_NAME,
+        "UPDATE images
+        SET breed_prediction = $2,
+        prediction_confidence = $3
+        WHERE path = $1",
+        [ImagePath, Prediction, Confidence]
+    ) of
+        {ok, 1} -> ok
+    end.
+
+has_ingested_url(Url) ->
+    case pgapp:equery(
+        ?POOL_NAME,
+        "SELECT path FROM images where original_url = $1",
+        [Url]
+    ) of
+        {ok, _Spec, Rows} -> length(Rows) > 0
     end.
