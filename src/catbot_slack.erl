@@ -8,6 +8,23 @@
 -define(SLACK_POST_MESSAGE, "https://slack.com/api/chat.postMessage").
 -define(BASE_CAT_URL, "https://catbot.rhye.org/").
 
+-define(AFFIRMATIVE_RESPONSES, [
+    "How about this nice ~s: ~s",
+    "Sure, pretty sure this photo is of a ~s: ~s",
+    "Found this ~s: ~s",
+    "What do you think of this ~s: ~s",
+    "~s? Sure: ~s",
+    "One ~s coming right up: ~s"
+]).
+
+-define(CORRECTED_RESPONSES, [
+    "How about this nice ~s instead: ~s",
+    "Pretty sure this ~s is close to what you want: ~s",
+    "Hmm, I found this ~s instead: ~s",
+    "What do you think of this ~s instead: ~s",
+    "Is ~s ok? ~s"
+]).
+
 -export([start_link/0]).
 
 %% gen_server callbacks
@@ -103,13 +120,16 @@ respond_for_cat(User, Channel, CatType) ->
         Sha ->
             CatUrl = ?BASE_CAT_URL ++ Sha,
             Message = case ActualCatType =:= CatType of
-                true ->
-                    io_lib:format("How about this nice ~s: ~s", [ActualCatType, CatUrl]);
-                false ->
-                    io_lib:format("Guessing you meant '~s': ~s", [ActualCatType, CatUrl])
+                true -> random_response(?AFFIRMATIVE_RESPONSES, ActualCatType, CatUrl);
+                false -> random_response(?CORRECTED_RESPONSES, ActualCatType, CatUrl)
             end,
             post_chat_message(Channel, list_to_binary(lists:flatten(Message)))
     end.
+
+random_response(ResponseOptions, CatType, Url) ->
+    Index = rand:uniform(length(ResponseOptions)),
+    FormatString = lists:nth(Index, ResponseOptions),
+    io_lib:format(FormatString, [CatType, Url]).
 
 make_valid_cat(CatType) ->
     % Get our known breeds
