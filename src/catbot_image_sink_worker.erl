@@ -56,7 +56,8 @@ ingest_url(State, From, Url) ->
         true ->
             case download_image(Url) of
                 {ok, ImageData} ->
-                    save_image(ImageData);
+                    {ok, FilePath} = save_image(ImageData),
+                    catbot_db:ingest_image(Url, FilePath);
                 error ->
                     ok
             end;
@@ -69,7 +70,8 @@ save_image(ImageData) ->
     Sha1 = hash_binary(ImageData),
     ok = filelib:ensure_dir(output_path()),
     OutFile = filename:join(output_path(), Sha1),
-    ok = file:write_file(OutFile, ImageData).
+    ok = file:write_file(OutFile, ImageData),
+    {ok, OutFile}.
 
 hash_binary(Binary) ->
     Ctx = crypto:hash_init(sha),

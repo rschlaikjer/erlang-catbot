@@ -13,7 +13,9 @@
         jsx,
         raven,
         estatsd,
-        inets
+        inets,
+        pgapp,
+        epgsql
     ]},
     {mod, { catbot_app, []}},
     {env, []}
