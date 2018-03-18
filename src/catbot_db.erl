@@ -90,7 +90,7 @@ set_prediction(Sha, Prediction, Confidence) ->
 has_ingested_url(Url) ->
     case pgapp:equery(
         ?POOL_NAME,
-        "SELECT path FROM images where original_url = $1",
+        "SELECT sha FROM images where original_url = $1",
         [Url]
     ) of
         {ok, _Spec, Rows} -> length(Rows) > 0
