@@ -1,0 +1,1 @@
+-record(source_subreddit, {name, high_water_mark, auto_prediction}).
