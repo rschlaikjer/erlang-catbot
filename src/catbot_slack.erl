@@ -64,7 +64,7 @@ handle_slack_message(State, Message=#slack_rtm_message{}) ->
         false ->
             ok;
         true ->
-            handle_cat_request(User, Channel, Text)
+            spawn(fun() -> handle_cat_request(User, Channel, Text) end)
     end,
     State;
 handle_slack_message(State, _Message) ->
