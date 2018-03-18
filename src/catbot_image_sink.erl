@@ -99,6 +99,8 @@ handle_worker_death(State, DeadPid) ->
     % Pretend the worker just finished a task so it gets picked up
     self() ! {ingest_ok, NewWorker},
 
+    % Log this as an error somewhere
+    estatsd:increment("catbot.ingest.error"),
     State#state{free_workers=Workers1}.
 
 ingest_url(State, Url, AutoPrediction) ->
