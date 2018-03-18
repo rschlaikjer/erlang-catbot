@@ -30,14 +30,14 @@ safe_unix_to_gregorian(Time) when is_integer(Time) ->
 safe_unix_to_gregorian(Other) ->
     Other.
 
-ingest_image(OriginalUrl, FilePath) ->
+ingest_image(Sha, OriginalUrl) ->
     case pgapp:equery(
         ?POOL_NAME,
         "INSERT INTO images
-        (original_url, path)
+        (sha, original_url)
         VALUES
         ($1, $2)",
-        [OriginalUrl, FilePath]
+        [Sha, OriginalUrl]
     ) of
         {ok, 1} -> ok;
         {error,{error,error,_,unique_violation,_,_}} -> ok
@@ -75,14 +75,14 @@ set_high_water(Name, HighWater) ->
         {ok, 1} -> ok
     end.
 
-set_prediction(ImagePath, Prediction, Confidence) ->
+set_prediction(Sha, Prediction, Confidence) ->
     case pgapp:equery(
         ?POOL_NAME,
         "UPDATE images
         SET breed_prediction = $2,
         prediction_confidence = $3
-        WHERE path = $1",
-        [ImagePath, Prediction, Confidence]
+        WHERE sha = $1",
+        [Sha, Prediction, Confidence]
     ) of
         {ok, 1} -> ok
     end.

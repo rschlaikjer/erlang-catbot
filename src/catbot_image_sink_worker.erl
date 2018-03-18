@@ -64,13 +64,13 @@ ingest_url(State, From, Url, AutoPrediction) ->
                 true ->
                     case download_image(Url) of
                         {ok, ImageData} ->
-                            {ok, FilePath} = save_image(ImageData),
-                            catbot_db:ingest_image(Url, FilePath),
+                            {ok, Sha} = save_image(ImageData),
+                            catbot_db:ingest_image(Sha, Url),
                             % If we have an autoprediction based on the source, apply
                             % that too
                             case AutoPrediction of
                                 B when is_binary(B) ->
-                                    catbot_db:set_prediction(FilePath, AutoPrediction, 1.0);
+                                    catbot_db:set_prediction(Sha, AutoPrediction, 1.0);
                                 _ -> ok
                             end;
                         error ->
@@ -85,7 +85,7 @@ save_image(ImageData) ->
     ok = filelib:ensure_dir(output_path()),
     OutFile = filename:join(output_path(), Sha1),
     ok = file:write_file(OutFile, ImageData),
-    {ok, OutFile}.
+    {ok, Sha1}.
 
 hash_binary(Binary) ->
     Ctx = crypto:hash_init(sha),
