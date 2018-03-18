@@ -60,7 +60,6 @@ handle_slack_message(State, Message=#slack_rtm_message{}) ->
     Channel = Message#slack_rtm_message.channel,
     User = Message#slack_rtm_message.user,
     Text = Message#slack_rtm_message.text,
-    lager:info("~s in ~s: ~s", [User, Channel, Text]),
     case message_is_for_catbot(Text) of
         false ->
             ok;
