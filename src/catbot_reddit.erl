@@ -3,6 +3,8 @@
 -behaviour(gen_server).
 -compile(export_all).
 
+-define(UPDATE_HEARTBEAT, 600000).
+
 -include("include/records.hrl").
 
 -export([start_link/0]).
@@ -23,7 +25,7 @@ start_link() ->
     gen_server:start_link(?MODULE, [], []).
 
 init([]) ->
-    self() ! heartbeat,
+    reset_heartbeat(),
     {ok, AccessToken} = get_access_token(),
     {ok, #state{bearer_token = AccessToken}}.
 
@@ -37,6 +39,7 @@ handle_cast(Msg, State) ->
 
 handle_info(heartbeat, State) ->
     State1 = update_all_subs(State),
+    reset_heartbeat(),
     {noreply, State1};
 handle_info(Info, State) ->
     lager:info("Info ~p", [Info]),
@@ -50,6 +53,10 @@ code_change(OldVsn, State, _Extra) ->
     {ok, State}.
 
 %% Internal functions
+
+reset_heartbeat() ->
+    Self = self(),
+    spawn(fun() -> timer:sleep(?UPDATE_HEARTBEAT), Self ! heartbeat end).
 
 reddit_config() ->
     {ok, Config} = application:get_env(catbot, reddit),
