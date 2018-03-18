@@ -9,20 +9,20 @@
 -define(BASE_CAT_URL, "https://catbot.rhye.org/").
 
 -define(AFFIRMATIVE_RESPONSES, [
-    "How about this nice ~s: ~s",
-    "Sure, pretty sure this photo is of a ~s: ~s",
-    "Found this ~s: ~s",
-    "What do you think of this ~s: ~s",
-    "~s? Sure: ~s",
-    "One ~s coming right up: ~s"
+    "How about this nice ~s (confidence: ~p): ~s",
+    "Sure, pretty sure this photo is of a ~s (confidence: ~p): ~s",
+    "Found this ~s (confidence: ~p): ~s",
+    "What do you think of this ~s (confidence: ~p): ~s",
+    "~s? Sure (confidence: ~p): ~s",
+    "One ~s coming right up (confidence: ~p): ~s"
 ]).
 
 -define(CORRECTED_RESPONSES, [
-    "How about this nice ~s instead: ~s",
-    "Pretty sure this ~s is close to what you want: ~s",
-    "Hmm, I found this ~s instead: ~s",
-    "What do you think of this ~s instead: ~s",
-    "Is ~s ok? ~s"
+    "How about this nice ~s instead (confidence: ~p): ~s",
+    "Pretty sure this ~s is close to what you want (confidence: ~p): ~s",
+    "Hmm, I found this ~s instead (confidence: ~p): ~s",
+    "What do you think of this ~s instead (confidence: ~p): ~s",
+    "Is ~s ok? (confidence: ~p) ~s"
 ]).
 
 -export([start_link/0]).
@@ -113,23 +113,23 @@ handle_cat_request(User, Channel, Text) ->
 respond_for_cat(User, Channel, CatType) ->
     ActualCatType = make_valid_cat(CatType),
     lager:info("Coerced cat from ~s to ~s", [CatType, ActualCatType]),
-    case get_sha_for_cat(ActualCatType) of
+    case catbot_db:get_image_for_cat_type(ActualCatType) of
         not_found ->
             Resp = lists:flatten(io_lib:format("Sorry, not sure what type of cat '~s' is", [CatType])),
             post_chat_message(Channel, list_to_binary(Resp));
-        Sha ->
+        {Sha, Confidence} ->
             CatUrl = ?BASE_CAT_URL ++ Sha,
             Message = case ActualCatType =:= CatType of
-                true -> random_response(?AFFIRMATIVE_RESPONSES, ActualCatType, CatUrl);
-                false -> random_response(?CORRECTED_RESPONSES, ActualCatType, CatUrl)
+                true -> random_response(?AFFIRMATIVE_RESPONSES, ActualCatType, Confidence, CatUrl);
+                false -> random_response(?CORRECTED_RESPONSES, ActualCatType, Confidence, CatUrl)
             end,
             post_chat_message(Channel, list_to_binary(lists:flatten(Message)))
     end.
 
-random_response(ResponseOptions, CatType, Url) ->
+random_response(ResponseOptions, CatType, Confidence, Url) ->
     Index = rand:uniform(length(ResponseOptions)),
     FormatString = lists:nth(Index, ResponseOptions),
-    io_lib:format(FormatString, [CatType, Url]).
+    io_lib:format(FormatString, [CatType, Confidence, Url]).
 
 make_valid_cat(CatType) ->
     % Get our known breeds
@@ -173,8 +173,6 @@ levenshtein([A | TA] = AA, [B | TB] = BA) ->
 lev_delta(_A, _A) -> 0;
 lev_delta(_A, _B) -> 1.
 
-get_sha_for_cat(Cat) ->
-    catbot_db:get_image_for_cat_type(Cat).
 
 respond_possible_cats(Channel) ->
     Cats = lists:sort(catbot_db:get_known_cat_types()),

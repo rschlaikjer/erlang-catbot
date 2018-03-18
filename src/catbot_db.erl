@@ -111,7 +111,7 @@ get_known_cat_types() ->
 get_image_for_cat_type(Cat) ->
     case pgapp:equery(
         ?POOL_NAME,
-        "SELECT sha
+        "SELECT sha, prediction_confidence
         FROM images
         WHERE breed_prediction LIKE $1
         ORDER BY random()
@@ -119,7 +119,7 @@ get_image_for_cat_type(Cat) ->
         [Cat]
     ) of
         {ok, _Spec, []} -> not_found;
-        {ok, _Spec, [{Sha}]} -> Sha
+        {ok, _Spec, [{Sha, Confidence}]} -> {Sha, Confidence}
     end.
 
 get_stats() ->
