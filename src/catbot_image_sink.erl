@@ -1,9 +1,13 @@
 -module(catbot_image_sink).
 -compile([{parse_transform, lager_transform}]).
 -behaviour(gen_server).
--compile(export_all).
 
--export([start_link/0]).
+-define(WORKER_COUNT, 8).
+
+-export([
+    start_link/0,
+    ingest/1
+]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -14,25 +18,44 @@
          code_change/3]).
 
 -record(state, {
+    pending_urls = [],
+    workers = [],
+    free_workers = []
 }).
 
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
-ingest(Url) ->
+ingest(Url) when is_binary(Url) ->
+    ingest(binary_to_list(Url));
+ingest(Url) when is_list(Url) ->
     gen_server:cast(?MODULE, {ingest_url, Url}).
 
 init([]) ->
-    {ok, #state{}}.
+    process_flag(trap_exit, true),
+    Workers = init_worker_pool(),
+    {ok, #state{
+        workers=Workers,
+        free_workers=Workers
+    }}.
 
 handle_call(Request, From, State) ->
     lager:info("Call ~p From ~p", [Request, From]),
     {reply, ignored, State}.
 
+handle_cast({ingest_url, Url}, State) ->
+    State1 = ingest_url(State, Url),
+    {noreply, State1};
 handle_cast(Msg, State) ->
     lager:info("Cast ~p", [Msg]),
     {noreply, State}.
 
+handle_info({ingest_ok, WorkerPid}, State) ->
+    State1 = handle_worker_return(State, WorkerPid),
+    {noreply, State1};
+handle_info({'EXIT', Pid, _Reason}, State) ->
+    State1 = handle_worker_death(State, Pid),
+    {noreply, State1};
 handle_info(Info, State) ->
     lager:info("Info ~p", [Info]),
     {noreply, State}.
@@ -46,15 +69,55 @@ code_change(OldVsn, State, _Extra) ->
 
 %% Internal functions
 
-is_image_url(Url) ->
-    case httpc:request(head, {Url, []}, [], []) of
-        {ok, {{_, 200, _}, Headers, _}} ->
-            ContentType = proplists:get_value("content-type", Headers),
-            is_content_type_image(ContentType);
-        _ -> false
+init_worker_pool() ->
+    Results = [
+        catbot_image_sink_worker:start_link() ||
+        _ <- lists:seq(1, ?WORKER_COUNT)
+    ],
+    _Pids = [Pid || {ok, Pid} <- Results].
+
+handle_worker_return(State, Pid) ->
+    case State#state.pending_urls of
+        [] ->
+            % No pending work, put worker back on ready list
+            State#state{free_workers=[Pid|State#state.free_workers]};
+        [Url|Urls] ->
+            % Pending url, send it to the worker and leave off the ready list
+            catbot_image_sink_worker:ingest(Pid, Url),
+            State#state{pending_urls=Urls}
     end.
 
-is_content_type_image(Type) when is_list(Type) ->
-    is_content_type_image(list_to_binary(Type));
-is_content_type_image(<<"image/", _Rest/binary>>) -> true;
-is_content_type_image(_) -> false.
+handle_worker_death(State, DeadPid) ->
+    % Remove the dead pid from worker + free worker lists
+    Workers1 = [Pid || Pid <- State#state.workers, Pid  =/= DeadPid],
+
+    % Add a new worker
+    {ok, NewWorker} = catbot_image_sink_worker:start_link(),
+    lager:info("Replacing dead worker ~p with new worker ~p", [DeadPid, NewWorker]),
+
+    % Pretend the worker just finished a task so it gets picked up
+    self() ! {ingest_ok, NewWorker},
+
+    State#state{free_workers=Workers1}.
+
+ingest_url(State, Url) ->
+    case has_free_worker(State) of
+        true ->
+            {ok, State1, Pid} = checkout_worker(State),
+            catbot_image_sink_worker:ingest(Pid, Url),
+            State1;
+        false ->
+            State#state{
+                pending_urls=[Url|State#state.pending_urls]
+            }
+    end.
+
+has_free_worker(State) ->
+    case State#state.free_workers of
+        [] -> false;
+        _ -> true
+    end.
+
+checkout_worker(State) ->
+    [W|Workers] = State#state.free_workers,
+    {ok, State#state{free_workers=Workers}, W}.

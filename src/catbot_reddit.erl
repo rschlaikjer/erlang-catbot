@@ -44,7 +44,9 @@ code_change(OldVsn, State, _Extra) ->
 
 %% Internal functions
 
-reddit_config() -> application:get_env(catbot, reddit).
+reddit_config() ->
+    {ok, Config} = application:get_env(catbot, reddit),
+    Config.
 oauth_client_id() -> proplists:get_value(client_id, reddit_config()).
 oauth_client_secret() -> proplists:get_value(client_secret, reddit_config()).
 user_agent() -> proplists:get_value(user_agent, reddit_config()).
@@ -85,7 +87,9 @@ make_api_request(State, Url) ->
     Options = [{body_format, binary}],
     case httpc:request(get, Request, HttpOptions, Options) of
         {ok, {{_, 200, _}, _RespHeaders, RespBody}} ->
-            {ok, jsx:decode(RespBody)}
+            {ok, jsx:decode(RespBody)};
+        {ok, {{_, 401, _}, _RespHeaders, _RespBody}} ->
+            {error, unauthorized}
     end.
 
 get_link_urls(State) ->
@@ -102,14 +106,6 @@ get_link_urls(State) ->
         fun erlang:is_binary/1,
         ChildUrls
     ).
-
-is_image_url(Url) ->
-    case httpc:request(head, {Url, []}, [], []) of
-        {ok, {{_, 200, _}, Headers, _}} ->
-            ContentType = proplists:get_value("content-type", Headers),
-            is_content_type_image(ContentType);
-        _ -> false
-    end.
 
 is_content_type_image(Type) when is_list(Type) ->
     is_content_type_image(list_to_binary(Type));
