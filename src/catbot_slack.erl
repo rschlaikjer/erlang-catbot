@@ -112,22 +112,34 @@ respond_for_cat(User, Channel, CatType) ->
     end.
 
 make_valid_cat(CatType) ->
+    % Get our known breeds
     ValidCats = catbot_db:get_known_cat_types(),
-    DistancePairs = [
-        {levenshtein:distance(binary_to_list(CatType), binary_to_list(ValidType)), ValidType}
-        || ValidType <- ValidCats
-    ],
-    {BestDistance, BestCat} = lists:foldl(
-        fun({D1, C1}, {D2, C2}) ->
-            case D1 < D2 of
-                true -> {D1, C1};
-                false -> {D2, C2}
-            end
-        end,
-        hd(DistancePairs),
-        DistancePairs
-    ),
-    BestCat.
+
+    % Check if the cat was already valid
+    case lists:any(
+        fun(C) -> C =:= CatType end,
+        ValidCats
+    ) of
+        % If the type is already in the list, don't need to do
+        % leven
+        true -> CatType;
+        false ->
+            DistancePairs = [
+                {levenshtein:distance(binary_to_list(CatType), binary_to_list(ValidType)), ValidType}
+                || ValidType <- ValidCats
+            ],
+            {BestDistance, BestCat} = lists:foldl(
+                fun({D1, C1}, {D2, C2}) ->
+                    case D1 < D2 of
+                        true -> {D1, C1};
+                        false -> {D2, C2}
+                    end
+                end,
+                hd(DistancePairs),
+                DistancePairs
+            ),
+            BestCat
+    end.
 
 levenshtein(A, []) -> length(A);
 levenshtein([], B) -> length(B);
