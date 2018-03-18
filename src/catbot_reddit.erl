@@ -116,7 +116,7 @@ update_all_subs(InitialState) ->
             _State1 = update_subreddit(State, Source)
         end,
         InitialState,
-        [catbot_db:get_source_subreddits()]
+        catbot_db:get_source_subreddits()
     ).
 
 update_subreddit(State, Sub=#source_subreddit{}) ->
