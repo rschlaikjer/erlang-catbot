@@ -86,7 +86,9 @@ handle_cat_request(User, Channel, Text) ->
     CatType = strip(strip_designator(Text)),
     case CatType of
         <<"list">> ->
-            respond_possible_cats(User, Channel);
+            respond_possible_cats(Channel);
+        <<"stats">> ->
+            respond_stats(Channel);
         _ ->
             lager:info("Asked for cat ~s", [CatType]),
             respond_for_cat(User, Channel, CatType)
@@ -145,10 +147,20 @@ lev_delta(_A, _B) -> 1.
 get_sha_for_cat(Cat) ->
     catbot_db:get_image_for_cat_type(Cat).
 
-respond_possible_cats(User, Channel) ->
+respond_possible_cats(Channel) ->
     Cats = lists:sort(catbot_db:get_known_cat_types()),
     CatsListBin = << <<C/binary, ", ">> || C <- Cats>>,
     Message = <<"I know about the following cats: ", CatsListBin/binary>>,
+    post_chat_message(Channel, Message).
+
+respond_stats(Channel) ->
+    Stats = catbot_db:get_stats(),
+    BreedCount = proplists:get_value(breeds, Stats),
+    ImageCount = proplists:get_value(images, Stats),
+    Message = list_to_binary(lists:flatten(io_lib:format(
+        "Currently indexing ~p images across ~p breeds",
+        [ImageCount, BreedCount]
+    ))),
     post_chat_message(Channel, Message).
 
 post_chat_message(Channel, Text) ->

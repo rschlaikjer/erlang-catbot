@@ -121,3 +121,18 @@ get_image_for_cat_type(Cat) ->
         {ok, _Spec, []} -> not_found;
         {ok, _Spec, [{Sha}]} -> Sha
     end.
+
+get_stats() ->
+    case pgapp:equery(
+        ?POOL_NAME,
+        "SELECT
+            count(distinct breed_prediction) as distinct_breeds,
+            count(*) as total_photos
+        FROM images",
+        []
+    ) of
+        {ok, _Spec, [{Breeds, Images}]} -> [
+            {breeds, Breeds},
+            {images, Images}
+        ]
+    end.
