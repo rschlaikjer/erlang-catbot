@@ -39,6 +39,7 @@ handle_cast(Msg, State) ->
 
 handle_info(heartbeat, State) ->
     State1 = update_all_subs(State),
+    log_stats(),
     reset_heartbeat(),
     {noreply, State1};
 handle_info(Info, State) ->
@@ -111,13 +112,21 @@ make_api_request(State, Url, Params) ->
     end.
 
 update_all_subs(InitialState) ->
-    _FinalState = lists:foldl(
+    FinalState = lists:foldl(
         fun(Source, State) ->
             _State1 = update_subreddit(State, Source)
         end,
         InitialState,
         catbot_db:get_source_subreddits()
-    ).
+    ),
+    FinalState.
+
+log_stats() ->
+    Stats = catbot_db:get_stats(),
+    BreedCount = proplists:get_value(breeds, Stats),
+    ImageCount = proplists:get_value(images, Stats),
+    estatsd:gauge("catbot.stats.tracked_image_count", ImageCount),
+    estatsd:gauge("catbot.stats.tracked_breed_count", BreedCount).
 
 update_subreddit(State, Sub=#source_subreddit{}) ->
     % Get the base API url
