@@ -95,3 +95,29 @@ has_ingested_url(Url) ->
     ) of
         {ok, _Spec, Rows} -> length(Rows) > 0
     end.
+
+get_known_cat_types() ->
+    case pgapp:equery(
+        ?POOL_NAME,
+        "SELECT DISTINCT breed_prediction FROM images
+         WHERE breed_prediction IS NOT NULL
+         AND breed_prediction != ''",
+        []
+    ) of
+        {ok, _Spec, Rows} ->
+            [Breed || {Breed} <- Rows]
+    end.
+
+get_image_for_cat_type(Cat) ->
+    case pgapp:equery(
+        ?POOL_NAME,
+        "SELECT sha
+        FROM images
+        WHERE breed_prediction LIKE $1
+        ORDER BY random()
+        LIMIT 1",
+        [Cat]
+    ) of
+        {ok, _Spec, []} -> not_found;
+        {ok, _Spec, [{Sha}]} -> Sha
+    end.

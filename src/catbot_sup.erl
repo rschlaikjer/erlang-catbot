@@ -26,6 +26,14 @@ init([]) ->
      3000,
      worker,
      [catbot_reddit]
+    },
+    {
+     catbot_slack,
+     {catbot_slack, start_link, []},
+     permanent,
+     3000,
+     worker,
+     [catbot_slack]
     }
     ],
     {ok, { {one_for_one, 5, 10}, Children} }.

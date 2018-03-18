@@ -8,14 +8,14 @@
         sasl,
         runtime_tools,
         crypto,
-        cowboy,
         lager,
         jsx,
         raven,
         estatsd,
         inets,
         pgapp,
-        epgsql
+        epgsql,
+        slack_rtm
     ]},
     {mod, { catbot_app, []}},
     {env, []}
