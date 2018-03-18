@@ -122,6 +122,18 @@ get_image_for_cat_type(Cat) ->
         {ok, _Spec, [{Sha, Confidence}]} -> {Sha, Confidence}
     end.
 
+get_random_image() ->
+    case pgapp:equery(
+        ?POOL_NAME,
+        "SELECT sha, breed_prediction, prediction_confidence
+        FROM images
+        ORDER BY random()
+        LIMIT 1",
+        []
+    ) of
+        {ok, _Spec, [{Sha, Breed, Confidence}]} -> {Sha, Breed, Confidence}
+    end.
+
 get_stats() ->
     case pgapp:equery(
         ?POOL_NAME,

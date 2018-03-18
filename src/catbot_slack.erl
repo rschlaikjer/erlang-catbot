@@ -105,8 +105,9 @@ handle_cat_request(User, Channel, Text) ->
             respond_possible_cats(Channel);
         <<"stats">> ->
             respond_stats(Channel);
+        <<"random">> ->
+            respond_random(Channel);
         _ ->
-            lager:info("Asked for cat ~s", [CatType]),
             respond_for_cat(User, Channel, CatType)
     end.
 
@@ -125,6 +126,18 @@ respond_for_cat(User, Channel, CatType) ->
             end,
             post_chat_message(Channel, list_to_binary(lists:flatten(Message)))
     end.
+
+respond_random(Channel) ->
+    % Pick an image totally at random
+    {Sha, Breed, Confidence} = catbot_db:get_random_image(),
+    CatUrl = ?BASE_CAT_URL ++ Sha,
+    Resp = case Breed of
+        null ->
+            lists:flatten(io_lib:format("Not sure what this is, but here: ~s", [CatUrl]));
+        _ ->
+            lists:flatten(io_lib:format("Rolled the dice, got a ~s (confidence ~p): ~s", [Breed, Confidence, CatUrl]))
+    end,
+    post_chat_message(Channel, list_to_binary(Resp)).
 
 random_response(ResponseOptions, CatType, Confidence, Url) ->
     Index = rand:uniform(length(ResponseOptions)),
