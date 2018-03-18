@@ -113,12 +113,10 @@ respond_for_cat(User, Channel, CatType) ->
 
 make_valid_cat(CatType) ->
     ValidCats = catbot_db:get_known_cat_types(),
-    lager:info("Valid cats: ~p", [ValidCats]),
     DistancePairs = [
         {levenshtein:distance(binary_to_list(CatType), binary_to_list(ValidType)), ValidType}
         || ValidType <- ValidCats
     ],
-    lager:info("Distance pairs: ~p", [DistancePairs]),
     {BestDistance, BestCat} = lists:foldl(
         fun({D1, C1}, {D2, C2}) ->
             case D1 < D2 of
