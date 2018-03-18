@@ -1,0 +1,20 @@
+{application, catbot, [
+    {description, ""},
+    {vsn, "1"},
+    {registered, []},
+    {applications, [
+        kernel,
+        stdlib,
+        sasl,
+        runtime_tools,
+        crypto,
+        cowboy,
+        lager,
+        jsx,
+        raven,
+        estatsd,
+        inets
+    ]},
+    {mod, { catbot_app, []}},
+    {env, []}
+]}.
