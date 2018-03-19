@@ -107,6 +107,8 @@ handle_cat_request(User, Channel, Text) ->
             respond_stats(Channel);
         <<"random">> ->
             respond_random(Channel);
+        <<"breakdown">> ->
+            respond_breakdown(Channel);
         _ ->
             respond_for_cat(User, Channel, CatType)
     end.
@@ -191,6 +193,42 @@ respond_possible_cats(Channel) ->
     Cats = lists:sort(catbot_db:get_known_cat_types()),
     CatsListBin = << <<C/binary, ", ">> || C <- Cats>>,
     Message = <<"I know about the following cats: ", CatsListBin/binary>>,
+    post_chat_message(Channel, Message).
+
+respond_breakdown(Channel) ->
+    FullStats = catbot_db:get_classification_stats(),
+
+    % Get the longest name to calculate padding
+    MaxNameLen = lists:foldl(
+        fun(Name, PrevLongest) ->
+            case byte_size(Name) > PrevLongest of
+                true -> byte_size(Name);
+                false -> PrevLongest
+            end
+        end,
+        0,
+        [Name || {Name, _Count} <- FullStats]
+    ),
+
+    % Pad all the names to match
+    FormatPairs = lists:foldl(
+        fun({Name, Count}, Acc) ->
+            Padding = << <<" ">> || _ <- lists:seq(1, MaxNameLen-byte_size(Name))>>,
+            Tuple = {<<Name/binary, Padding/binary>>, list_to_binary(io_lib:format("~10.10. B", [Count]))},
+            [Tuple|Acc]
+        end,
+        [],
+        FullStats
+    ),
+
+    ClassificationData = <<
+        <<N/binary, C/binary, "\n">> || {N, C} <- lists:reverse(FormatPairs)
+    >>,
+
+    Message = list_to_binary(lists:flatten(io_lib:format(
+        "Image classification stats:~n```~n~s~n```",
+        [ClassificationData]
+    ))),
     post_chat_message(Channel, Message).
 
 respond_stats(Channel) ->

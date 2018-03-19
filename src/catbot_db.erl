@@ -148,3 +148,20 @@ get_stats() ->
             {images, Images}
         ]
     end.
+
+get_classification_stats() ->
+    case pgapp:equery(
+        ?POOL_NAME,
+        "SELECT
+            CASE
+                WHEN breed_prediction IS NOT NULL THEN breed_prediction
+                ELSE '(uncategorized)'
+            END,
+            count(*) AS image_count
+        FROM images
+        GROUP BY breed_prediction
+        ORDER BY image_count DESC",
+        []
+    ) of
+        {ok, _Spec, Rows} -> Rows
+    end.
