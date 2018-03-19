@@ -137,7 +137,7 @@ respond_random(Channel) ->
         null ->
             lists:flatten(io_lib:format("Not sure what this is, but here: ~s", [CatUrl]));
         _ ->
-            lists:flatten(io_lib:format("Rolled the dice, got a ~s (confidence ~p): ~s", [Breed, Confidence, CatUrl]))
+            lists:flatten(io_lib:format("Rolled the dice, got a ~s cat (confidence ~p): ~s", [Breed, Confidence, CatUrl]))
     end,
     post_chat_message(Channel, list_to_binary(Resp)).
 
