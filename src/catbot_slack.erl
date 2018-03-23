@@ -160,7 +160,7 @@ make_valid_cat(CatType) ->
         true -> CatType;
         false ->
             DistancePairs = [
-                {levenshtein:distance(binary_to_list(CatType), binary_to_list(ValidType)), ValidType}
+                {levenshtein:levenshtein(binary_to_list(CatType), binary_to_list(ValidType)), ValidType}
                 || ValidType <- ValidCats
             ],
             {BestDistance, BestCat} = lists:foldl(
@@ -175,19 +175,6 @@ make_valid_cat(CatType) ->
             ),
             BestCat
     end.
-
-levenshtein(A, []) -> length(A);
-levenshtein([], B) -> length(B);
-levenshtein([A | TA] = AA, [B | TB] = BA) ->
-    lists:min([
-        levenshtein(TA, BA) + 1,
-        levenshtein(AA, TB) + 1,
-        levenshtein(TA, TB) + lev_delta(A, B)
-    ]).
-
-lev_delta(_A, _A) -> 0;
-lev_delta(_A, _B) -> 1.
-
 
 respond_possible_cats(Channel) ->
     Cats = lists:sort(catbot_db:get_known_cat_types()),
