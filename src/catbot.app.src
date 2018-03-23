@@ -15,7 +15,8 @@
         inets,
         pgapp,
         epgsql,
-        slack_rtm
+        slack_rtm,
+        levenshtein
     ]},
     {mod, { catbot_app, []}},
     {env, []}
