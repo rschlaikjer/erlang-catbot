@@ -160,7 +160,7 @@ make_valid_cat(CatType) ->
         true -> CatType;
         false ->
             DistancePairs = [
-                {levenshtein:levenshtein(binary_to_list(CatType), binary_to_list(ValidType)), ValidType}
+                {levenshtein:levenshtein(CatType, ValidType), ValidType}
                 || ValidType <- ValidCats
             ],
             {BestDistance, BestCat} = lists:foldl(
