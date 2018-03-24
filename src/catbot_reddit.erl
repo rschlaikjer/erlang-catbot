@@ -126,7 +126,17 @@ log_stats() ->
     BreedCount = proplists:get_value(breeds, Stats),
     ImageCount = proplists:get_value(images, Stats),
     estatsd:gauge("catbot.stats.tracked_image_count", ImageCount),
-    estatsd:gauge("catbot.stats.tracked_breed_count", BreedCount).
+    estatsd:gauge("catbot.stats.tracked_breed_count", BreedCount),
+    lists:foreach(
+        fun({Breed, Count}) ->
+            Stat = lists:flatten(io_lib:format(
+                "catbot.stats.breeds.~s",
+                [binary:replace(Breed, <<" ">>, <<"_">>, [global])]
+            )),
+            estatsd:gauge(Stat, Count)
+        end,
+        catbot_db:get_classification_stats()
+    ).
 
 update_subreddit(State, Sub=#source_subreddit{}) ->
     % Get the base API url
