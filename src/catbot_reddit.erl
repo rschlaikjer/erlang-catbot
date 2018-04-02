@@ -4,6 +4,7 @@
 -compile(export_all).
 
 -define(UPDATE_HEARTBEAT, 600000).
+-define(STATS_INTERVAL, 10000).
 
 -include("include/records.hrl").
 
@@ -27,6 +28,7 @@ start_link() ->
 init([]) ->
     reset_heartbeat(),
     {ok, AccessToken} = get_access_token(),
+    spawn_link(fun() -> stats_worker() end),
     {ok, #state{bearer_token = AccessToken}}.
 
 handle_call(Request, From, State) ->
@@ -39,7 +41,6 @@ handle_cast(Msg, State) ->
 
 handle_info(heartbeat, State) ->
     State1 = update_all_subs(State),
-    log_stats(),
     reset_heartbeat(),
     {noreply, State1};
 handle_info(Info, State) ->
@@ -124,6 +125,11 @@ update_all_subs(InitialState) ->
         catbot_db:get_source_subreddits()
     ),
     FinalState.
+
+stats_worker() ->
+    timer:sleep(?STATS_INTERVAL),
+    log_stats(),
+    stats_worker().
 
 log_stats() ->
     Stats = catbot_db:get_stats(),
