@@ -84,6 +84,8 @@ get_access_token() ->
     HttpOptions = [{autoredirect, false}],
     Options = [{body_format, binary}],
     case httpc:request(post, Request, HttpOptions, Options) of
+        {ok, {{_, 503, _}, _RespHeaders, RespBody}} ->
+            {error, service_unavailable};
         {ok, {{_, 200, _}, _RespHeaders, RespBody}} ->
             Json = jsx:decode(RespBody),
             case proplists:get_value(<<"access_token">>, Json) of
