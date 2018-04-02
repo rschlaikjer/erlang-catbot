@@ -108,7 +108,9 @@ make_api_request(State, Url, Params) ->
         {ok, {{_, 200, _}, _RespHeaders, RespBody}} ->
             {ok, jsx:decode(RespBody)};
         {ok, {{_, 401, _}, _RespHeaders, _RespBody}} ->
-            {error, unauthorized}
+            {error, unauthorized};
+        {ok, {{_, 503, _}, _RespHeaders, _RespBody}} ->
+            {error, service_unavailable}
     end.
 
 update_all_subs(InitialState) ->
@@ -213,5 +215,7 @@ update_subreddit(State, Sub=#source_subreddit{}) ->
         {error, unauthorized} ->
             % Re-up the access token and try again
             {ok, AccessToken} = get_access_token(),
-            update_subreddit(State#state{bearer_token=AccessToken}, Sub)
+            update_subreddit(State#state{bearer_token=AccessToken}, Sub);
+        {error, Reason} ->
+            lager:info("Failed to update: ~p~n", [Reason])
     end.
