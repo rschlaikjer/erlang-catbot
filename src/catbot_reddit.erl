@@ -171,7 +171,6 @@ update_subreddit(State, Sub=#source_subreddit{}) ->
 
             % Get the child elements in the list
             Children = proplists:get_value(<<"children">>, Data),
-            lager:info("Fetched ~p records for sub ~s", [length(Children), Sub#source_subreddit.name]),
 
             % If we didn't get any children, there's been nothing new since
             % the last high water mark
