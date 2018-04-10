@@ -165,3 +165,36 @@ get_classification_stats() ->
     ) of
         {ok, _Spec, Rows} -> Rows
     end.
+
+get_all_shas() ->
+    case pgapp:equery(
+        ?POOL_NAME,
+        "SELECT sha
+        FROM images",
+        []
+    ) of
+        {ok, _RowSpec, Rows} -> [
+            Sha || {Sha} <- Rows
+        ]
+    end.
+
+vacuum_images() ->
+    % Get the image store path
+    {ok, Paths} = application:get_env(catbot, paths),
+    ImageDir = proplists:get_value(images, Paths),
+
+    % Get all the SHAs we track
+    Shas = get_all_shas(),
+
+    % For each sha, check it still exists
+    lists:foreach(
+        fun(Sha) ->
+            case filelib:is_file(filename:join(ImageDir, Sha)) of
+                true -> ok;
+                false ->
+                    lager:info("Sha ~p has disappeared", [Sha]),
+                    ok
+            end
+        end,
+        Shas
+    ).
