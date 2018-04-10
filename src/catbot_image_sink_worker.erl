@@ -64,14 +64,18 @@ ingest_url(State, From, Url, AutoPrediction) ->
                 true ->
                     case download_image(Url) of
                         {ok, ImageData} ->
-                            {ok, Sha} = save_image(ImageData),
-                            catbot_db:ingest_image(Sha, Url),
-                            % If we have an autoprediction based on the source, apply
-                            % that too
-                            case AutoPrediction of
-                                B when is_binary(B) ->
-                                    catbot_db:set_prediction(Sha, AutoPrediction, 1.0);
-                                _ -> ok
+                            case save_image(ImageData) of
+                                {ok, Sha} ->
+                                    catbot_db:ingest_image(Sha, Url),
+                                    % If we have an autoprediction based on the source, apply
+                                    % that too
+                                    case AutoPrediction of
+                                        B when is_binary(B) ->
+                                            catbot_db:set_prediction(Sha, AutoPrediction, 1.0);
+                                        _ -> ok
+                                    end;
+                                {error, Sha, Reason} ->
+                                    lager:error("Failed to save image with sha ~s: ~p", [Sha, Reason])
                             end;
                         error ->
                             ok
@@ -84,8 +88,14 @@ save_image(ImageData) ->
     Sha1 = hash_binary(ImageData),
     ok = filelib:ensure_dir(output_path()),
     OutFile = filename:join(output_path(), Sha1),
-    ok = file:write_file(OutFile, ImageData),
-    {ok, Sha1}.
+    case filelib:is_file(OutFile) of
+        true -> {ok, Sha1};
+        false ->
+            case file:write_file(OutFile, ImageData) of
+                ok -> {ok, Sha1};
+                {error, Reason} -> {error, Sha1, Reason}
+            end
+    end.
 
 hash_binary(Binary) ->
     Ctx = crypto:hash_init(sha),
