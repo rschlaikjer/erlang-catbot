@@ -200,8 +200,21 @@ update_subreddit(State, Sub=#source_subreddit{}) ->
                         ValidUrls
                     ),
 
-                    % Grab the first child's name as a highwater
-                    FirstChild = hd(Children),
+                    % Grab the most recent child's name as a highwater
+                    FirstChild = lists:foldl(
+                        fun(C1, C2) ->
+                            C1Data = proplists:get_value(<<"data">>, C1, []),
+                            C1Created = proplists:get_value(<<"created_utc">>, C1Data, 0),
+                            C2Data = proplists:get_value(<<"data">>, C2, []),
+                            C2Created = proplists:get_value(<<"created_utc">>, C2Data, 0),
+                            case C1Created > C2Created of
+                                true -> C1;
+                                false -> C2
+                            end
+                        end,
+                        hd(Children),
+                        Children
+                    ),
                     FirstChildData = proplists:get_value(<<"data">>, FirstChild, []),
                     FirstChildName = proplists:get_value(<<"name">>, FirstChildData),
                     HighWater = FirstChildName,
