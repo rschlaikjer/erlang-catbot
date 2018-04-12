@@ -66,7 +66,7 @@ ingest_url(State, From, Url, AutoPrediction) ->
                         {ok, ImageData} ->
                             case save_image(ImageData) of
                                 {ok, Sha} ->
-                                    catbot_db:ingest_image(Sha, Url),
+                                    catbot_db:ingest_image(Sha, Url, byte_size(ImageData)),
                                     % If we have an autoprediction based on the source, apply
                                     % that too
                                     case AutoPrediction of

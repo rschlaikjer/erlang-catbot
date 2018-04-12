@@ -222,9 +222,11 @@ respond_stats(Channel) ->
     Stats = catbot_db:get_stats(),
     BreedCount = proplists:get_value(breeds, Stats),
     ImageCount = proplists:get_value(images, Stats),
+    TotalImageSize = proplists:get_value(bytes, Stats),
+    SizeString = io_lib:format("~.1f GiB", [TotalImageSize / (1024 * 1024 * 1024)]),
     Message = list_to_binary(lists:flatten(io_lib:format(
-        "Currently indexing ~p images across ~p breeds",
-        [ImageCount, BreedCount]
+        "Currently indexing ~p images (~s) across ~p breeds",
+        [ImageCount, SizeString, BreedCount]
     ))),
     post_chat_message(Channel, Message).
 

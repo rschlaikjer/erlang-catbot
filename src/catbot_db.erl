@@ -30,14 +30,14 @@ safe_unix_to_gregorian(Time) when is_integer(Time) ->
 safe_unix_to_gregorian(Other) ->
     Other.
 
-ingest_image(Sha, OriginalUrl) ->
+ingest_image(Sha, OriginalUrl, SizeBytes) ->
     case pgapp:equery(
         ?POOL_NAME,
         "INSERT INTO images
-        (sha, original_url)
+        (sha, original_url, size_bytes)
         VALUES
-        ($1, $2)",
-        [Sha, OriginalUrl]
+        ($1, $2, $3)",
+        [Sha, OriginalUrl, SizeBytes]
     ) of
         {ok, 1} -> ok;
         {error,{error,error,_,unique_violation,_,_}} -> ok
@@ -139,13 +139,15 @@ get_stats() ->
         ?POOL_NAME,
         "SELECT
             count(distinct breed_prediction) as distinct_breeds,
-            count(*) as total_photos
+            count(*) as total_photos,
+            sum(size_bytes) as total_image_bytes
         FROM images",
         []
     ) of
-        {ok, _Spec, [{Breeds, Images}]} -> [
+        {ok, _Spec, [{Breeds, Images, Bytes}]} -> [
             {breeds, Breeds},
-            {images, Images}
+            {images, Images},
+            {bytes, Bytes}
         ]
     end.
 
@@ -177,6 +179,34 @@ get_all_shas() ->
             Sha || {Sha} <- Rows
         ]
     end.
+
+update_sizes() ->
+    % Get the image store path
+    {ok, Paths} = application:get_env(catbot, paths),
+    ImageDir = proplists:get_value(images, Paths),
+
+    % Get all the SHAs we track
+    Shas = get_all_shas(),
+
+    % For each sha, check it still exists
+    lists:foreach(
+        fun(Sha) ->
+            Path = filename:join(ImageDir, Sha),
+            case filelib:is_file(Path) of
+                true ->
+                    Size = filelib:file_size(Path),
+                    pgapp:equery(
+                        ?POOL_NAME,
+                        "UPDATE images SET size_bytes = $1 WHERE sha = $2",
+                        [Size, Sha]
+                    );
+                false ->
+                    lager:info("Sha ~p has disappeared", [Sha]),
+                    ok
+            end
+        end,
+        Shas
+    ).
 
 vacuum_images() ->
     % Get the image store path
