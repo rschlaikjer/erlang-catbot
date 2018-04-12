@@ -149,18 +149,24 @@ log_stats() ->
     ).
 
 update_subreddit(State, Sub=#source_subreddit{}) ->
+    update_subreddit(State, Sub, undefined).
+
+update_subreddit(State, Sub=#source_subreddit{}, After) ->
     % Get the base API url
     NameList = binary_to_list(Sub#source_subreddit.name),
+    lager:info("Updating subreddit ~p", [Sub#source_subreddit.name]),
     Url = "https://oauth.reddit.com/r/" ++ NameList ++ "/new",
 
     % Increase page size
     Params = [
-        {<<"limit">>, <<"100">>}
+        {<<"limit">>, <<"100">>},
+        {<<"count">>, <<"100">>}
     ],
 
     % Add 'after' param if known
-    Params1 = case Sub#source_subreddit.high_water_mark of
-        B when is_binary(B) -> [{<<"before">>, B}|Params];
+    Params1 = case After of
+        B when is_binary(B) ->
+              [{<<"after">>, B}|Params];
         _ -> Params
     end,
 
@@ -175,8 +181,11 @@ update_subreddit(State, Sub=#source_subreddit{}) ->
             % If we didn't get any children, there's been nothing new since
             % the last high water mark
             case Children of
-                [] -> State;
+                [] ->
+                    lager:info("Got no children, update finished"),
+                    State;
                 _ ->
+                    lager:info("Got ~p children", [length(Children)]),
                     % Extract the data from each subelement
                     ChildData = [
                         proplists:get_value(<<"data">>, Child, []) || Child <- Children
@@ -187,7 +196,7 @@ update_subreddit(State, Sub=#source_subreddit{}) ->
                         proplists:get_value(<<"url">>, Datum) || Datum <- ChildData
                     ],
 
-                    % Filter out and junk from URLs that weren't set
+                    % Filter out any junk from URLs that weren't set
                     ValidUrls = lists:filter(
                         fun erlang:is_binary/1,
                         ChildUrls
@@ -200,42 +209,65 @@ update_subreddit(State, Sub=#source_subreddit{}) ->
                         ValidUrls
                     ),
 
-                    % Grab the most recent child's name as a highwater
-                    FirstChild = lists:foldl(
+                    GetChildData = fun(Child, DataField) ->
+                        proplists:get_value(DataField, proplists:get_value(<<"data">>, Child, []))
+                    end,
+
+                    ChildComparator = fun(Comparator) ->
                         fun(C1, C2) ->
-                            C1Data = proplists:get_value(<<"data">>, C1, []),
-                            C1Created = proplists:get_value(<<"created_utc">>, C1Data, 0),
-                            C2Data = proplists:get_value(<<"data">>, C2, []),
-                            C2Created = proplists:get_value(<<"created_utc">>, C2Data, 0),
-                            case C1Created > C2Created of
+                            C1Created = GetChildData(C1, <<"created_utc">>),
+                            C2Created = GetChildData(C2, <<"created_utc">>),
+                            case Comparator(C1Created, C2Created) of
                                 true -> C1;
                                 false -> C2
                             end
-                        end,
-                        hd(Children),
-                        Children
-                    ),
-                    FirstChildData = proplists:get_value(<<"data">>, FirstChild, []),
-                    FirstChildName = proplists:get_value(<<"name">>, FirstChildData),
-                    HighWater = FirstChildName,
-                    lager:info("New high water mark for ~s: ~s", [Sub#source_subreddit.name, HighWater]),
-
-                    % Update the highwater on the DB
-                    case HighWater of
-                        H when is_binary(H) ->
-                            catbot_db:set_high_water(Sub#source_subreddit.name, HighWater);
-                        _ -> ok
+                        end
                     end,
 
-                    % Recurse on the new high water mark
-                    update_subreddit(State, Sub#source_subreddit{
-                        high_water_mark=HighWater
-                    })
+                    % Grab the earliest child as the new highwater, iff we
+                    % haven't started paging backwards already
+                    case After of
+                        undefined ->
+                            FirstChild = lists:foldl(
+                                ChildComparator(fun(C1, C2) -> C1 > C2 end),
+                                hd(Children),
+                                Children
+                            ),
+                            FirstChildName = GetChildData(FirstChild, <<"name">>),
+                            catbot_db:set_high_water(Sub#source_subreddit.name, FirstChildName),
+                            lager:info("New high water mark for ~s: ~s", [Sub#source_subreddit.name, FirstChildName]);
+                        _  -> ok
+                    end,
+
+                    % Check if this batch contained the high water mark, and if
+                    % it did, stop.
+                    ReachedHighWater = lists:foldl(
+                        fun(A, B) -> A or B end,
+                        false,
+                        [GetChildData(C, <<"name">>) =:= Sub#source_subreddit.high_water_mark || C <- Children]
+                    ),
+
+                    case ReachedHighWater of
+                        true -> State;
+                        false ->
+                            % Get the last child for use as an 'after'
+                            LastChild = lists:foldl(
+                                ChildComparator(fun(C1, C2) -> C1 < C2 end),
+                                hd(Children),
+                                Children
+                            ),
+                            LastChildData = proplists:get_value(<<"data">>, LastChild, []),
+                            LastChildName = proplists:get_value(<<"name">>, LastChildData),
+
+                            % Recurse using the last child as an after
+                            update_subreddit(State, Sub, LastChildName)
+                    end
             end;
         {error, unauthorized} ->
             % Re-up the access token and try again
             {ok, AccessToken} = get_access_token(),
             update_subreddit(State#state{bearer_token=AccessToken}, Sub);
         {error, Reason} ->
-            lager:info("Failed to update: ~p~n", [Reason])
+            lager:info("Failed to update: ~p~n", [Reason]),
+            State
     end.
