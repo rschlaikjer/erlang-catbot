@@ -154,7 +154,14 @@ update_subreddit(State, Sub=#source_subreddit{}) ->
 update_subreddit(State, Sub=#source_subreddit{}, After) ->
     % Get the base API url
     NameList = binary_to_list(Sub#source_subreddit.name),
-    lager:info("Updating subreddit ~p", [Sub#source_subreddit.name]),
+    case After of
+        _ when is_binary(After) ->
+            lager:info("Updating subreddit ~s (after: ~s)",
+                       [Sub#source_subreddit.name, After]);
+        _ ->
+            lager:info("Updating subreddit ~s",
+                       [Sub#source_subreddit.name])
+    end,
     Url = "https://oauth.reddit.com/r/" ++ NameList ++ "/new",
 
     % Increase page size
