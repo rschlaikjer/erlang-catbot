@@ -135,8 +135,10 @@ log_stats() ->
     Stats = catbot_db:get_stats(),
     BreedCount = proplists:get_value(breeds, Stats),
     ImageCount = proplists:get_value(images, Stats),
+    ByteSize = proplists:get_value(bytes, Stats),
     estatsd:gauge("catbot.stats.tracked_image_count", ImageCount),
     estatsd:gauge("catbot.stats.tracked_breed_count", BreedCount),
+    estatsd:gauge("catbot.stats.tracked_image_size", ByteSize),
     lists:foreach(
         fun({Breed, Count}) ->
             Stat = lists:flatten(io_lib:format(
