@@ -77,7 +77,6 @@ init_worker_pool() ->
     _Pids = [Pid || {ok, Pid} <- Results].
 
 handle_worker_return(State, Pid) ->
-    estatsd:increment("catbot.ingest.success"),
     case State#state.pending_urls of
         [] ->
             % No pending work, put worker back on ready list
