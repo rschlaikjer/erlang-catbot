@@ -13,7 +13,7 @@ init() ->
       Database = proplists:get_value(database, DbInfo),
       pgapp:connect(
           ?POOL_NAME, [
-              {size, 4},
+              {size, 10},
               {host, Host},
               {database, Database},
               {username, Username},
