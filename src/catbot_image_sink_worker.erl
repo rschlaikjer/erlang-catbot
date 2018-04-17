@@ -72,7 +72,7 @@ ingest_url(State, From, Url, AutoPrediction) ->
                                     % that too
                                     case AutoPrediction of
                                         B when is_binary(B) ->
-                                            catbot_db:set_prediction(Sha, AutoPrediction, 1.0);
+                                            catbot_db:set_prediction(Sha, AutoPrediction, 0.95);
                                         _ -> ok
                                     end;
                                 {error, Sha, Reason} ->
