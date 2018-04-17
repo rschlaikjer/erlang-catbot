@@ -109,9 +109,24 @@ handle_cat_request(User, Channel, Text) ->
             respond_random(Channel);
         <<"breakdown">> ->
             respond_breakdown(Channel);
+        <<"help">> ->
+            respond_help(Channel);
         _ ->
             respond_for_cat(User, Channel, CatType)
     end.
+
+respond_help(Channel) ->
+    Header <<"You can address me by starting a message with either `@catbot` or `catbot,` and following it with either a command or the name of a breed.\nI support the following commands:\n">>,
+    Cmds = [
+        <<"- random: Special keyword that selects an image at random">>,
+        <<"- list: List all known breeds of cat">>,
+        <<"- stats: Print statstics on my dataset">>,
+        <<"- breakdown: Detailed statistics on each breed">>,
+        <<"- help: This help message">>
+    ],
+    CmdList = << <<Cmd/binary, "\n">> || Cmd <- Cmds >>,
+    Help = <<"I support the following commands:\n", CmdList/binary>>
+    post_chat_message(Channel, Help).
 
 respond_for_cat(User, Channel, CatType) ->
     ActualCatType = make_valid_cat(CatType),
