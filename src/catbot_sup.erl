@@ -28,12 +28,12 @@ init([]) ->
      [catbot_reddit]
     },
     {
-     catbot_slack,
-     {catbot_slack, start_link, []},
+     catbot_slack_sup,
+     {catbot_slack_sup, start_link, []},
      permanent,
      3000,
-     worker,
-     [catbot_slack]
+     supervisor,
+     [catbot_slack_sup]
     }
     ],
     {ok, { {one_for_one, 5, 10}, Children} }.

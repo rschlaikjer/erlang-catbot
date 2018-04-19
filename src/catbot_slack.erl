@@ -25,7 +25,7 @@
     "Is ~s ok? (confidence: ~p) ~s"
 ]).
 
--export([start_link/0]).
+-export([start_link/1]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -36,14 +36,16 @@
          code_change/3]).
 
 -record(state, {
+    slack_token
 }).
 
-start_link() ->
-    gen_server:start_link(?MODULE, [], []).
+start_link(Token) ->
+    gen_server:start_link(?MODULE, [Token], []).
 
-init([]) ->
-    slack_rtm:connect(slack_token()),
-    {ok, #state{}}.
+init([SlackToken]) ->
+    lager:info("Starting slack worker with token ~p", [SlackToken]),
+    slack_rtm:connect(SlackToken),
+    {ok, #state{slack_token=SlackToken}}.
 
 handle_call(Request, From, State) ->
     lager:info("Call ~p From ~p", [Request, From]),
@@ -69,10 +71,6 @@ code_change(OldVsn, State, _Extra) ->
 
 %% Internal functions
 
-slack_token() ->
-    {ok, Slack} = application:get_env(catbot, slack),
-    proplists:get_value(api_token, Slack).
-
 handle_slack_message(State, Message=#slack_rtm_message{}) ->
     Channel = Message#slack_rtm_message.channel,
     User = Message#slack_rtm_message.user,
@@ -81,7 +79,7 @@ handle_slack_message(State, Message=#slack_rtm_message{}) ->
         false ->
             ok;
         true ->
-            spawn(fun() -> handle_cat_request(User, Channel, Text) end)
+            spawn(fun() -> handle_cat_request(State, User, Channel, Text) end)
     end,
     State;
 handle_slack_message(State, _Message) ->
@@ -89,7 +87,8 @@ handle_slack_message(State, _Message) ->
 
 message_is_for_catbot(<<"catbot,", _/binary>>) -> true;
 message_is_for_catbot(<<"<@U9RSC6P50>", _/binary>>) -> true;
-message_is_for_catbot(_) -> false.
+message_is_for_catbot(<<"<@U3C6F7SBB>", _/binary>>) -> true;
+message_is_for_catbot(Msg) -> false.
 
 strip_designator(<<"catbot,", Rest/binary>>) -> Rest;
 strip_designator(<<"<@U9RSC6P50>", Rest/binary>>) -> Rest;
@@ -98,24 +97,24 @@ strip_designator(Any) -> Any.
 strip(<<" ", B/binary>>) -> strip(B);
 strip(<<B/binary>>) -> B.
 
-handle_cat_request(User, Channel, Text) ->
+handle_cat_request(State, User, Channel, Text) ->
     CatType = strip(strip_designator(Text)),
     case CatType of
         <<"list">> ->
-            respond_possible_cats(Channel);
+            respond_possible_cats(State, Channel);
         <<"stats">> ->
-            respond_stats(Channel);
+            respond_stats(State, Channel);
         <<"random">> ->
-            respond_random(Channel);
+            respond_random(State, Channel);
         <<"breakdown">> ->
-            respond_breakdown(Channel);
+            respond_breakdown(State, Channel);
         <<"help">> ->
-            respond_help(Channel);
+            respond_help(State, Channel);
         _ ->
-            respond_for_cat(User, Channel, CatType)
+            respond_for_cat(State, User, Channel, CatType)
     end.
 
-respond_help(Channel) ->
+respond_help(State, Channel) ->
     Header = <<"You can address me by starting a message with either `@catbot` or `catbot,` and following it with either a command or the name of a breed.\nI support the following commands:\n">>,
     Cmds = [
         <<"- random: Special keyword that selects an image at random">>,
@@ -126,25 +125,25 @@ respond_help(Channel) ->
     ],
     CmdList = << <<Cmd/binary, "\n">> || Cmd <- Cmds >>,
     Help = <<Header/binary, CmdList/binary>>,
-    post_chat_message(Channel, Help).
+    post_chat_message(State, Channel, Help).
 
-respond_for_cat(User, Channel, CatType) ->
+respond_for_cat(State, User, Channel, CatType) ->
     ActualCatType = make_valid_cat(CatType),
     lager:info("Coerced cat from ~s to ~s", [CatType, ActualCatType]),
     case catbot_db:get_image_for_cat_type(ActualCatType) of
         not_found ->
             Resp = lists:flatten(io_lib:format("Sorry, not sure what type of cat '~s' is", [CatType])),
-            post_chat_message(Channel, list_to_binary(Resp));
+            post_chat_message(State, Channel, list_to_binary(Resp));
         {Sha, Confidence} ->
             CatUrl = ?BASE_CAT_URL ++ Sha,
             Message = case ActualCatType =:= CatType of
                 true -> random_response(?AFFIRMATIVE_RESPONSES, ActualCatType, Confidence, CatUrl);
                 false -> random_response(?CORRECTED_RESPONSES, ActualCatType, Confidence, CatUrl)
             end,
-            post_chat_message(Channel, list_to_binary(lists:flatten(Message)))
+            post_chat_message(State, Channel, list_to_binary(lists:flatten(Message)))
     end.
 
-respond_random(Channel) ->
+respond_random(State, Channel) ->
     % Pick an image totally at random
     {Sha, Breed, Confidence} = catbot_db:get_random_image(),
     CatUrl = ?BASE_CAT_URL ++ Sha,
@@ -154,7 +153,7 @@ respond_random(Channel) ->
         _ ->
             lists:flatten(io_lib:format("Rolled the dice, got a ~s cat (confidence ~p): ~s", [Breed, Confidence, CatUrl]))
     end,
-    post_chat_message(Channel, list_to_binary(Resp)).
+    post_chat_message(State, Channel, list_to_binary(Resp)).
 
 random_response(ResponseOptions, CatType, Confidence, Url) ->
     Index = rand:uniform(length(ResponseOptions)),
@@ -191,13 +190,13 @@ make_valid_cat(CatType) ->
             BestCat
     end.
 
-respond_possible_cats(Channel) ->
+respond_possible_cats(State, Channel) ->
     Cats = lists:sort(catbot_db:get_known_cat_types()),
     CatsListBin = << <<C/binary, ", ">> || C <- Cats>>,
     Message = <<"I know about the following cats: ", CatsListBin/binary>>,
-    post_chat_message(Channel, Message).
+    post_chat_message(State, Channel, Message).
 
-respond_breakdown(Channel) ->
+respond_breakdown(State, Channel) ->
     FullStats = catbot_db:get_classification_stats(),
 
     % Get the longest name to calculate padding
@@ -231,9 +230,9 @@ respond_breakdown(Channel) ->
         "Image classification stats:~n```~n~s~n```",
         [ClassificationData]
     ))),
-    post_chat_message(Channel, Message).
+    post_chat_message(State, Channel, Message).
 
-respond_stats(Channel) ->
+respond_stats(State, Channel) ->
     Stats = catbot_db:get_stats(),
     BreedCount = proplists:get_value(breeds, Stats),
     ImageCount = proplists:get_value(images, Stats),
@@ -243,16 +242,16 @@ respond_stats(Channel) ->
         "Currently indexing ~p images (~s) across ~p breeds",
         [ImageCount, SizeString, BreedCount]
     ))),
-    post_chat_message(Channel, Message).
+    post_chat_message(State, Channel, Message).
 
-post_chat_message(Channel, Text) ->
+post_chat_message(State, Channel, Text) ->
     Json = jsx:encode([
         {<<"channel">>, Channel},
         {<<"text">>, Text},
         {<<"as_user">>, true},
         {<<"username">>, <<"catbot">>}
     ]),
-    RtmToken = slack_token(),
+    RtmToken = State#state.slack_token,
     Headers = [
        {"authorization", binary_to_list(<<"Bearer ", RtmToken/binary>>)}
     ],
