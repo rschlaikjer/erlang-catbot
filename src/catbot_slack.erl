@@ -75,7 +75,7 @@ handle_slack_message(State, Message=#slack_rtm_message{}) ->
     Channel = Message#slack_rtm_message.channel,
     User = Message#slack_rtm_message.user,
     Text = Message#slack_rtm_message.text,
-    case message_is_for_catbot(Text, Channel) of
+    case message_is_for_catbot(Text, Channel, User) of
         false ->
             ok;
         true ->
@@ -85,12 +85,15 @@ handle_slack_message(State, Message=#slack_rtm_message{}) ->
 handle_slack_message(State, _Message) ->
     State.
 
-message_is_for_catbot(<<"catbot,", _/binary>>, _) -> true;
-message_is_for_catbot(<<"<@U9RSC6P50>", _/binary>>, _) -> true;
-message_is_for_catbot(<<"<@U3C6F7SBB>", _/binary>>, _) -> true;
-message_is_for_catbot(<<"<@UA9LU96TW>", _/binary>>, _) -> true;
-message_is_for_catbot(_Msg, <<"D", _/binary>>) -> true;
-message_is_for_catbot(_Msg, _Channel) -> false.
+message_is_for_catbot(_, _, <<"U9RSC6P50">>) -> false;
+message_is_for_catbot(_, _, <<"U3C6F7SBB">>) -> false;
+message_is_for_catbot(_, _, <<"UA9LU96TW">>) -> false;
+message_is_for_catbot(<<"catbot,", _/binary>>, _, _) -> true;
+message_is_for_catbot(<<"<@U9RSC6P50>", _/binary>>, _, _) -> true;
+message_is_for_catbot(<<"<@U3C6F7SBB>", _/binary>>, _), _ -> true;
+message_is_for_catbot(<<"<@UA9LU96TW>", _/binary>>, _, _) -> true;
+message_is_for_catbot(_Msg, <<"D", _/binary>>, _) -> true;
+message_is_for_catbot(_Msg, _Channel, _User) -> false.
 
 strip_designator(<<"catbot,", Rest/binary>>) -> Rest;
 strip_designator(<<"<@U9RSC6P50>", Rest/binary>>) -> Rest;
