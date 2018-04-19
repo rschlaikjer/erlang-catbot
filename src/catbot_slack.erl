@@ -89,6 +89,8 @@ message_is_for_catbot(_, _, <<"U9RSC6P50">>) -> false;
 message_is_for_catbot(_, _, <<"U3C6F7SBB">>) -> false;
 message_is_for_catbot(_, _, <<"UA9LU96TW">>) -> false;
 message_is_for_catbot(<<"catbot,", _/binary>>, _, _) -> true;
+message_is_for_catbot(<<"Catbot,", _/binary>>, _, _) -> true;
+message_is_for_catbot(<<"CATBOT,", _/binary>>, _, _) -> true;
 message_is_for_catbot(<<"<@U9RSC6P50>", _/binary>>, _, _) -> true;
 message_is_for_catbot(<<"<@U3C6F7SBB>", _/binary>>, _, _) -> true;
 message_is_for_catbot(<<"<@UA9LU96TW>", _/binary>>, _, _) -> true;
