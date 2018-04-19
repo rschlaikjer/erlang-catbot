@@ -93,6 +93,8 @@ message_is_for_catbot(Msg) -> false.
 
 strip_designator(<<"catbot,", Rest/binary>>) -> Rest;
 strip_designator(<<"<@U9RSC6P50>", Rest/binary>>) -> Rest;
+strip_designator(<<"<@U3C6F7SBB>", _/binary>>) -> true;
+strip_designator(<<"<@UA9LU96TW>", _/binary>>) -> true;
 strip_designator(Any) -> Any.
 
 strip(<<" ", B/binary>>) -> strip(B);
