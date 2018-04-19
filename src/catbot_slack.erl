@@ -88,6 +88,7 @@ handle_slack_message(State, _Message) ->
 message_is_for_catbot(<<"catbot,", _/binary>>) -> true;
 message_is_for_catbot(<<"<@U9RSC6P50>", _/binary>>) -> true;
 message_is_for_catbot(<<"<@U3C6F7SBB>", _/binary>>) -> true;
+message_is_for_catbot(<<"<@UA9LU96TW>", _/binary>>) -> true;
 message_is_for_catbot(Msg) -> false.
 
 strip_designator(<<"catbot,", Rest/binary>>) -> Rest;
