@@ -90,7 +90,7 @@ message_is_for_catbot(_, _, <<"U3C6F7SBB">>) -> false;
 message_is_for_catbot(_, _, <<"UA9LU96TW">>) -> false;
 message_is_for_catbot(<<"catbot,", _/binary>>, _, _) -> true;
 message_is_for_catbot(<<"<@U9RSC6P50>", _/binary>>, _, _) -> true;
-message_is_for_catbot(<<"<@U3C6F7SBB>", _/binary>>, _), _ -> true;
+message_is_for_catbot(<<"<@U3C6F7SBB>", _/binary>>, _, _) -> true;
 message_is_for_catbot(<<"<@UA9LU96TW>", _/binary>>, _, _) -> true;
 message_is_for_catbot(_Msg, <<"D", _/binary>>, _) -> true;
 message_is_for_catbot(_Msg, _Channel, _User) -> false.
