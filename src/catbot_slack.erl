@@ -96,6 +96,8 @@ message_is_for_catbot(_Msg, <<"D", _/binary>>, _) -> true;
 message_is_for_catbot(_Msg, _Channel, _User) -> false.
 
 strip_designator(<<"catbot,", Rest/binary>>) -> Rest;
+strip_designator(<<"Catbot,", Rest/binary>>) -> Rest;
+strip_designator(<<"CATBOT,", Rest/binary>>) -> Rest;
 strip_designator(<<"<@U9RSC6P50>", Rest/binary>>) -> Rest;
 strip_designator(<<"<@U3C6F7SBB>", Rest/binary>>) -> Rest;
 strip_designator(<<"<@UA9LU96TW>", Rest/binary>>) -> Rest;
