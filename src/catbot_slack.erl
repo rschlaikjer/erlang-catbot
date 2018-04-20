@@ -171,9 +171,12 @@ random_response(ResponseOptions, CatType, Confidence, Url) ->
     FormatString = lists:nth(Index, ResponseOptions),
     io_lib:format(FormatString, [CatType, Confidence, Url]).
 
-make_valid_cat(CatType) ->
+make_valid_cat(CatTypeIn) ->
     % Get our known breeds
     ValidCats = catbot_db:get_known_cat_types(),
+
+    % Lowercase the input
+    CatType = list_to_binary(string:to_lower(binary_to_list(CatTypeIn))),
 
     % Check if the cat was already valid
     case lists:any(
