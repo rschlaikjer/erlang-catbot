@@ -156,14 +156,6 @@ update_subreddit(State, Sub=#source_subreddit{}) ->
 update_subreddit(State, Sub=#source_subreddit{}, After) ->
     % Get the base API url
     NameList = binary_to_list(Sub#source_subreddit.name),
-    case After of
-        _ when is_binary(After) ->
-            lager:info("Updating subreddit ~s (after: ~s)",
-                       [Sub#source_subreddit.name, After]);
-        _ ->
-            lager:info("Updating subreddit ~s",
-                       [Sub#source_subreddit.name])
-    end,
     Url = "https://oauth.reddit.com/r/" ++ NameList ++ "/new",
 
     % Increase page size
@@ -191,10 +183,8 @@ update_subreddit(State, Sub=#source_subreddit{}, After) ->
             % the last high water mark
             case Children of
                 [] ->
-                    lager:info("Got no children, update finished"),
                     State;
                 _ ->
-                    lager:info("Got ~p children", [length(Children)]),
                     % Extract the data from each subelement
                     ChildData = [
                         proplists:get_value(<<"data">>, Child, []) || Child <- Children
@@ -243,8 +233,7 @@ update_subreddit(State, Sub=#source_subreddit{}, After) ->
                                 Children
                             ),
                             FirstChildName = GetChildData(FirstChild, <<"name">>),
-                            catbot_db:set_high_water(Sub#source_subreddit.name, FirstChildName),
-                            lager:info("New high water mark for ~s: ~s", [Sub#source_subreddit.name, FirstChildName]);
+                            catbot_db:set_high_water(Sub#source_subreddit.name, FirstChildName);
                         _  -> ok
                     end,
 
