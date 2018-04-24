@@ -2,7 +2,6 @@ FROM erlang:19.3.6.3 as builder
 
 WORKDIR /src
 COPY . /src
-COPY /creds/catbot/prod.config /src/files/
 RUN rebar3 as prod tar
 
 RUN mkdir -p /release

@@ -7,6 +7,10 @@ node {
         sh "git rev-parse origin/${sha1} > .commit"
     }
 
+    stage('Inject credentials') {
+        sh "cp /creds/catbot/prod.config files/prod.config"
+    }
+
     stage('Build image') {
         app = docker.build("erlang-catbot")
     }
