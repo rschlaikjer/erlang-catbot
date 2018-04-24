@@ -66,7 +66,7 @@
  {<<"restc">>,{pkg,<<"restc">>,<<"0.4.1">>},1},
  {<<"slack_rtm">>,
   {git,"https://github.com/rschlaikjer/erlang-slack-rtm-api.git",
-       {ref,"4786764b808d9510bbffb8a2781b339139175a36"}},
+       {ref,"9f2a3ceb9a868f034faf279c91d4f12bc58f0ae1"}},
   0},
  {<<"ssl_verify_fun">>,{pkg,<<"ssl_verify_fun">>,<<"1.1.1">>},3}]}.
 [

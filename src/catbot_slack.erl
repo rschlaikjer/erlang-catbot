@@ -36,7 +36,9 @@
          code_change/3]).
 
 -record(state, {
-    slack_token
+    slack_token,
+    user_id,
+    quoted_user_id
 }).
 
 start_link(Token) ->
@@ -55,6 +57,9 @@ handle_cast(Msg, State) ->
     lager:info("Cast ~p", [Msg]),
     {noreply, State}.
 
+handle_info({slack_connected, _From, UserId}, State) ->
+    QuotedId = <<"<@", UserId/binary, ">">>,
+    {noreply, State#state{user_id=UserId, quoted_user_id=QuotedId}};
 handle_info({slack_msg, _From, Message}, State) ->
     State1 = handle_slack_message(State, Message),
     {noreply, State};
@@ -75,7 +80,7 @@ handle_slack_message(State, Message=#slack_rtm_message{}) ->
     Channel = Message#slack_rtm_message.channel,
     User = Message#slack_rtm_message.user,
     Text = Message#slack_rtm_message.text,
-    case message_is_for_catbot(Text, Channel, User) of
+    case message_is_for_catbot(State, Text, Channel, User) of
         false ->
             ok;
         true ->
@@ -85,31 +90,35 @@ handle_slack_message(State, Message=#slack_rtm_message{}) ->
 handle_slack_message(State, _Message) ->
     State.
 
-message_is_for_catbot(_, _, <<"U9RSC6P50">>) -> false;
-message_is_for_catbot(_, _, <<"U3C6F7SBB">>) -> false;
-message_is_for_catbot(_, _, <<"UA9LU96TW">>) -> false;
-message_is_for_catbot(<<"catbot,", _/binary>>, _, _) -> true;
-message_is_for_catbot(<<"Catbot,", _/binary>>, _, _) -> true;
-message_is_for_catbot(<<"CATBOT,", _/binary>>, _, _) -> true;
-message_is_for_catbot(<<"<@U9RSC6P50>", _/binary>>, _, _) -> true;
-message_is_for_catbot(<<"<@U3C6F7SBB>", _/binary>>, _, _) -> true;
-message_is_for_catbot(<<"<@UA9LU96TW>", _/binary>>, _, _) -> true;
-message_is_for_catbot(_Msg, <<"D", _/binary>>, _) -> true;
-message_is_for_catbot(_Msg, _Channel, _User) -> false.
+% Ignore messages catbot sent itself
+message_is_for_catbot(#state{user_id=Uid}, _, _, Uid) -> false;
+% Plain to accept
+message_is_for_catbot(_, <<"catbot,", _/binary>>, _, _) -> true;
+message_is_for_catbot(_, <<"Catbot,", _/binary>>, _, _) -> true;
+message_is_for_catbot(_, <<"CATBOT,", _/binary>>, _, _) -> true;
+% If the channel begins with D it's a DM, assume we're being talked at
+message_is_for_catbot(_, _Msg, <<"D", _/binary>>, _) -> true;
+% Anything else is probably not for us
+message_is_for_catbot(#state{quoted_user_id=Qid}, Msg, _Channel, _User) ->
+    case binary:match(Msg, Qid) of
+        {0, L} -> true;
+        nomatch -> false
+    end.
 
-strip_designator(<<"catbot,", Rest/binary>>) -> Rest;
-strip_designator(<<"Catbot,", Rest/binary>>) -> Rest;
-strip_designator(<<"CATBOT,", Rest/binary>>) -> Rest;
-strip_designator(<<"<@U9RSC6P50>", Rest/binary>>) -> Rest;
-strip_designator(<<"<@U3C6F7SBB>", Rest/binary>>) -> Rest;
-strip_designator(<<"<@UA9LU96TW>", Rest/binary>>) -> Rest;
-strip_designator(Any) -> Any.
+strip_designator(_, <<"catbot,", Rest/binary>>) -> Rest;
+strip_designator(_, <<"Catbot,", Rest/binary>>) -> Rest;
+strip_designator(_, <<"CATBOT,", Rest/binary>>) -> Rest;
+strip_designator(#state{quoted_user_id=Qid}, Message) ->
+    case binary:match(Message, Qid) of
+        {0, L} -> binary:part(Message, L, byte_size(Message) - L);
+        nomatch -> Message
+    end.
 
 strip(<<" ", B/binary>>) -> strip(B);
 strip(<<B/binary>>) -> B.
 
 handle_cat_request(State, User, Channel, Text) ->
-    CatType = strip(strip_designator(Text)),
+    CatType = strip(strip_designator(State, Text)),
     case CatType of
         <<"list">> ->
             respond_possible_cats(State, Channel);
