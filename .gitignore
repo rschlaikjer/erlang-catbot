@@ -16,3 +16,5 @@ src/ecountant_records_pb.erl
 src/ecountant_responses_pb.erl
 include/ecountant_requests_pb.hrl
 src/ecountant_requests_pb.erl
+files/local.config
+files/prod.config
