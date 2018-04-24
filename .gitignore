@@ -6,7 +6,6 @@ deps
 .eunit
 _build/
 log/
-rebar.lock
 files/app.config
 include/any_pb.hrl
 include/ecountant_records_pb.hrl
