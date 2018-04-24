@@ -93,11 +93,11 @@ handle_slack_message(State, _Message) ->
 % Ignore messages catbot sent itself
 message_is_for_catbot(#state{user_id=Uid}, _, _, Uid) -> false;
 % Plain to accept
-message_is_for_catbot(_, <<"catbot,", _/binary>>, _, _) -> true;
-message_is_for_catbot(_, <<"Catbot,", _/binary>>, _, _) -> true;
-message_is_for_catbot(_, <<"CATBOT,", _/binary>>, _, _) -> true;
+message_is_for_catbot(_, <<"catbot,", _/binary>>, _, Msg) when is_binary(Msg) -> true;
+message_is_for_catbot(_, <<"Catbot,", _/binary>>, _, Msg) when is_binary(Msg) -> true;
+message_is_for_catbot(_, <<"CATBOT,", _/binary>>, _, Msg) when is_binary(Msg) -> true;
 % If the channel begins with D it's a DM, assume we're being talked at
-message_is_for_catbot(_, _Msg, <<"D", _/binary>>, _) -> true;
+message_is_for_catbot(_, _Msg, <<"D", _/binary>>, Msg) when is_binary(Msg) -> true;
 % Anything else is probably not for us
 message_is_for_catbot(#state{quoted_user_id=Qid}, Msg, _Channel, _User) when is_binary(Msg) ->
     case binary:match(Msg, Qid) of
