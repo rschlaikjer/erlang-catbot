@@ -99,20 +99,22 @@ message_is_for_catbot(_, <<"CATBOT,", _/binary>>, _, _) -> true;
 % If the channel begins with D it's a DM, assume we're being talked at
 message_is_for_catbot(_, _Msg, <<"D", _/binary>>, _) -> true;
 % Anything else is probably not for us
-message_is_for_catbot(#state{quoted_user_id=Qid}, Msg, _Channel, _User) ->
+message_is_for_catbot(#state{quoted_user_id=Qid}, Msg, _Channel, _User) when is_binary(Msg) ->
     case binary:match(Msg, Qid) of
         {0, L} -> true;
         nomatch -> false
-    end.
+    end;
+message_is_for_catbot(_, _, _, _) -> false.
 
 strip_designator(_, <<"catbot,", Rest/binary>>) -> Rest;
 strip_designator(_, <<"Catbot,", Rest/binary>>) -> Rest;
 strip_designator(_, <<"CATBOT,", Rest/binary>>) -> Rest;
-strip_designator(#state{quoted_user_id=Qid}, Message) ->
+strip_designator(#state{quoted_user_id=Qid}, Message) when is_binary(Message) ->
     case binary:match(Message, Qid) of
         {0, L} -> binary:part(Message, L, byte_size(Message) - L);
         nomatch -> Message
-    end.
+    end;
+strip_designator(_, Msg) -> Msg.
 
 strip(<<" ", B/binary>>) -> strip(B);
 strip(<<B/binary>>) -> B.
