@@ -78,6 +78,9 @@ ingest_url(State, From, Url, AutoPrediction) ->
                                 {error, Sha, Reason} ->
                                     lager:error("Failed to save image with sha ~s: ~p", [Sha, Reason])
                             end;
+                        {error, Reason} ->
+                            lager:info("Failed to download image: ~p~n", [Reason]),
+                            ok;
                         error ->
                             ok
                     end
@@ -111,6 +114,9 @@ output_path() ->
 
 is_image_url(Url) ->
     case httpc:request(head, {Url, []}, [], []) of
+        {error, Reason} ->
+            lager:info("Failed to HEAD url: ~p", [Reason]),
+            false;
         {ok, {{_, 200, _}, Headers, _}} ->
             ContentType = proplists:get_value("content-type", Headers),
             is_content_type_image(ContentType);
@@ -119,6 +125,8 @@ is_image_url(Url) ->
 
 download_image(Url) ->
     case httpc:request(get, {Url, []}, [], [{body_format, binary}]) of
+        {error, Reason} ->
+            {error, Reason};
         {ok, {{_, 200, _}, _, Body}} ->
             {ok, Body};
         _ -> error

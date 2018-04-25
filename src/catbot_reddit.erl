@@ -85,6 +85,8 @@ get_access_token() ->
     HttpOptions = [{autoredirect, false}],
     Options = [{body_format, binary}],
     case httpc:request(post, Request, HttpOptions, Options) of
+        {error, Reason} ->
+            {error, Reason};
         {ok, {{_, 503, _}, _RespHeaders, RespBody}} ->
             {error, service_unavailable};
         {ok, {{_, 200, _}, _RespHeaders, RespBody}} ->
@@ -108,6 +110,8 @@ make_api_request(State, Url, Params) ->
     HttpOptions = [{autoredirect, true}],
     Options = [{body_format, binary}],
     case httpc:request(get, Request, HttpOptions, Options) of
+        {error, Reason} ->
+            {error, Reason};
         {ok, {{_, 200, _}, _RespHeaders, RespBody}} ->
             {ok, jsx:decode(RespBody)};
         {ok, {{_, 401, _}, _RespHeaders, _RespBody}} ->
