@@ -100,7 +100,7 @@ handle_worker_death(State, DeadPid) ->
 
     % Log this as an error somewhere
     estatsd:increment("catbot.ingest.error"),
-    State#state{free_workers=Workers1}.
+    State#state{workers=Workers1}.
 
 ingest_url(State, Url, AutoPrediction) ->
     case has_free_worker(State) of
