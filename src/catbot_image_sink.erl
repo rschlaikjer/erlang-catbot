@@ -19,7 +19,6 @@
 
 -record(state, {
     pending_urls = [],
-    workers = [],
     free_workers = []
 }).
 
@@ -35,7 +34,6 @@ init([]) ->
     process_flag(trap_exit, true),
     Workers = init_worker_pool(),
     {ok, #state{
-        workers=Workers,
         free_workers=Workers
     }}.
 
@@ -88,10 +86,7 @@ handle_worker_return(State, Pid) ->
     end.
 
 handle_worker_death(State, DeadPid) ->
-    % Remove the dead pid from worker + free worker lists
-    Workers1 = [Pid || Pid <- State#state.workers, Pid  =/= DeadPid],
-
-    % Add a new worker
+    % Spawn a new worker
     {ok, NewWorker} = catbot_image_sink_worker:start_link(),
     lager:info("Replacing dead worker ~p with new worker ~p", [DeadPid, NewWorker]),
 
@@ -100,7 +95,7 @@ handle_worker_death(State, DeadPid) ->
 
     % Log this as an error somewhere
     estatsd:increment("catbot.ingest.error"),
-    State#state{workers=Workers1}.
+    State.
 
 ingest_url(State, Url, AutoPrediction) ->
     case has_free_worker(State) of
