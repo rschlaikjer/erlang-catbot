@@ -137,7 +137,7 @@ handle_cat_request(State, User, Channel, Text) ->
     end.
 
 respond_help(State, Channel) ->
-    Header = <<"You can address me by starting a message with either `@catbot` or `catbot,` and following it with either a command or the name of a breed.\nI support the following commands:\n">>,
+    Header = <<"You can address me by starting a message with either `@catbot` or `catbot,` and following it with either a command or the name of a breed. You can also DM me, in which case you don't need to address me by name!\nI support the following commands:\n">>,
     Cmds = [
         <<"- random: Special keyword that selects an image at random">>,
         <<"- list: List all known breeds of cat">>,
