@@ -116,8 +116,12 @@ make_api_request(State, Url, Params) ->
             {ok, jsx:decode(RespBody)};
         {ok, {{_, 401, _}, _RespHeaders, _RespBody}} ->
             {error, unauthorized};
+        {ok, {{_, 500, _}, _RespHeaders, _RespBody}} ->
+            {error, server_error};
         {ok, {{_, 503, _}, _RespHeaders, _RespBody}} ->
-            {error, service_unavailable}
+            {error, service_unavailable};
+        {ok, {{_, 504, _}, _RespHeaders, _RespBody}} ->
+            {error, gateway_timeout}
     end.
 
 update_all_subs(InitialState) ->
