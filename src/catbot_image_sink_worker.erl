@@ -113,9 +113,9 @@ output_path() ->
     proplists:get_value(images, Paths).
 
 is_image_url(Url) ->
-    case httpc:request(head, {Url, []}, [], []) of
+    case httpc:request(head, {Url, []}, [{timeout, 30000}], []) of
         {error, Reason} ->
-            lager:info("Failed to HEAD url: ~p", [Reason]),
+            lager:info("Failed to HEAD url ~s: ~p", [Reason]),
             false;
         {ok, {{_, 200, _}, Headers, _}} ->
             ContentType = proplists:get_value("content-type", Headers),
