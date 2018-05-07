@@ -191,7 +191,8 @@ update_sizes() ->
     % For each sha, check it still exists
     lists:foreach(
         fun(Sha) ->
-            Path = filename:join(ImageDir, Sha),
+            <<ShaPrefix:2/binary, ShaRest/binary>> = Sha,
+            Path = filename:join([ImageDir, ShaPrefix, ShaRest]),
             case filelib:is_file(Path) of
                 true ->
                     Size = filelib:file_size(Path),
@@ -219,7 +220,9 @@ vacuum_images() ->
     % For each sha, check it still exists
     lists:foreach(
         fun(Sha) ->
-            case filelib:is_file(filename:join(ImageDir, Sha)) of
+            <<ShaPrefix:2/binary, ShaRest/binary>> = Sha,
+            Path = filename:join([ImageDir, ShaPrefix, ShaRest]),
+            case filelib:is_file(Path) of
                 true -> ok;
                 false ->
                     lager:info("Sha ~p has disappeared", [Sha]),
