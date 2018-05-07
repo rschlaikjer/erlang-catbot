@@ -157,7 +157,8 @@ respond_for_cat(State, User, Channel, CatType) ->
             Resp = lists:flatten(io_lib:format("Sorry, not sure what type of cat '~s' is", [CatType])),
             post_chat_message(State, Channel, list_to_binary(Resp));
         {Sha, Confidence} ->
-            CatUrl = ?BASE_CAT_URL ++ Sha,
+            <<ShaPrefix:2/binary, ShaRest/binary>> = Sha,
+            CatUrl = ?BASE_CAT_URL ++ binary_to_list(ShaPrefix) ++ "/" ++ binary_to_list(ShaRest),
             Message = case ActualCatType =:= CatType of
                 true -> random_response(?AFFIRMATIVE_RESPONSES, ActualCatType, Confidence, CatUrl);
                 false -> random_response(?CORRECTED_RESPONSES, ActualCatType, Confidence, CatUrl)
@@ -168,7 +169,8 @@ respond_for_cat(State, User, Channel, CatType) ->
 respond_random(State, Channel) ->
     % Pick an image totally at random
     {Sha, Breed, Confidence} = catbot_db:get_random_image(),
-    CatUrl = ?BASE_CAT_URL ++ Sha,
+    <<ShaPrefix:2/binary, ShaRest/binary>> = Sha,
+    CatUrl = ?BASE_CAT_URL ++ binary_to_list(ShaPrefix) ++ "/" ++ binary_to_list(ShaRest),
     Resp = case Breed of
         null ->
             lists:flatten(io_lib:format("Not sure what this is, but here: ~s", [CatUrl]));

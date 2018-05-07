@@ -90,8 +90,10 @@ ingest_url(State, From, Url, AutoPrediction) ->
 
 save_image(ImageData) ->
     Sha1 = hash_binary(ImageData),
-    ok = filelib:ensure_dir(output_path()),
-    OutFile = filename:join(output_path(), Sha1),
+    <<ShaPrefix:2/binary, ShaRest/binary>> = Sha1,
+    OutDir = filename:join(output_path(), ShaPrefix),
+    ok = filelib:ensure_dir(OutDir),
+    OutFile = filename:join(OutDir, ShaRest),
     case filelib:is_file(OutFile) of
         true -> {ok, Sha1};
         false ->
