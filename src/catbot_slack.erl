@@ -102,7 +102,7 @@ message_is_for_catbot(_, _Msg, <<"D", _/binary>>, Msg) when is_binary(Msg) -> tr
 message_is_for_catbot(#state{quoted_user_id=Qid}, Msg, _Channel, _User) when is_binary(Msg) ->
     case binary:match(Msg, Qid) of
         {0, L} -> true;
-        nomatch -> false
+        _ -> false
     end;
 message_is_for_catbot(_, _, _, _) -> false.
 
