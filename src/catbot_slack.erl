@@ -149,7 +149,7 @@ respond_evict(State, Channel, User, Query) ->
             Sha = strip(Query),
             Msg = case catbot_db:delete_image(Sha) of
                 true -> <<"Ok, deleted image ", Sha/binary>>;
-                false -> <<"Failed to delete image ", Sha/binary>>
+                false -> <<"Couldn't find any image with a SHA of ", Sha/binary>>
             end,
             post_chat_message(State, Channel, Msg)
     end.
