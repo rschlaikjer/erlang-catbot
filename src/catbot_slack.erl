@@ -143,7 +143,7 @@ respond_evict(State, Channel, User, Query) ->
         false ->
             post_chat_message(
                 State, Channel,
-                <<"Sorry, ", User/binary, " is not in the sudoers file">>
+                <<"Sorry, <@", User/binary, "> is not in the sudoers file">>
             );
         true ->
             Sha = strip(Query),

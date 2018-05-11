@@ -111,7 +111,7 @@ delete_image(Sha) ->
         "DELETE FROM images WHERE sha = $1",
         [Sha]
     ) of
-        {ok} -> ok
+        {ok, RowsDeleted} -> RowsDeleted > 0
     end.
 
 get_known_cat_types() ->
