@@ -161,6 +161,7 @@ respond_help(State, Channel) ->
         <<"- list: List all known breeds of cat">>,
         <<"- stats: Print statstics on my dataset">>,
         <<"- breakdown: Detailed statistics on each breed">>,
+        <<"- evict <sha>: Remove an offending image from the database">>,
         <<"- help: This help message">>
     ],
     CmdList = << <<Cmd/binary, "\n">> || Cmd <- Cmds >>,
