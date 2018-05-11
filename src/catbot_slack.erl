@@ -132,8 +132,26 @@ handle_cat_request(State, User, Channel, Text) ->
             respond_breakdown(State, Channel);
         <<"help">> ->
             respond_help(State, Channel);
+        <<"evict ", Query/binary>> ->
+            respond_evict(State, Channel, User, Query);
         _ ->
             respond_for_cat(State, User, Channel, CatType)
+    end.
+
+respond_evict(State, Channel, User, Query) ->
+    case catbot_db:is_user_admin(User) of
+        false ->
+            post_chat_message(
+                State, Channel,
+                <<"Sorry, ", User/binary, " is not in the sudoers file">>
+            );
+        true ->
+            Sha = strip(Query),
+            Msg = case catbot_db:delete_image(Sha) of
+                true -> <<"Ok, deleted image ", Sha/binary>>;
+                false -> <<"Failed to delete image ", Sha/binary>>
+            end,
+            post_chat_message(State, Channel, Msg)
     end.
 
 respond_help(State, Channel) ->

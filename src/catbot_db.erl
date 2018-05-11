@@ -96,6 +96,24 @@ has_ingested_url(Url) ->
         {ok, _Spec, Rows} -> length(Rows) > 0
     end.
 
+is_user_admin(User) ->
+    case pgapp:equery(
+        ?POOL_NAME,
+        "SELECT slack_id FROM administrators where slack_id = $1",
+        [User]
+    ) of
+        {ok, _Spec, Rows} -> length(Rows) > 0
+    end.
+
+delete_image(Sha) ->
+    case pgapp:equery(
+        ?POOL_NAME,
+        "DELETE FROM images WHERE sha = $1",
+        [Sha]
+    ) of
+        {ok} -> ok
+    end.
+
 get_known_cat_types() ->
     case pgapp:equery(
         ?POOL_NAME,
